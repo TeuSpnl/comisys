@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Painel do Usuário Master</title>
+</head>
+<body>
+    <h1>Painel do Usuário Master</h1>
+    <p>Meta Geral: R$ {{ general_goal }}</p>
+    <p>IDs dos Vendedores:</p>
+    <ul>
+        {% for seller in sellers %}
+            <li>
+                <a href="{{ url_for('seller_dashboard', seller_id=seller.id) }}">
+                    ID: {{ seller.id }} - Nome: {{ seller.username }}
+                </a>
+            </li>
+        {% endfor %}
+    </ul>
+    <p>Implementar funcionalidades de cadastro de metas e upload de planilhas.</p>
+    <a href="{{ url_for('upload') }}">Upload de Planilha</a><br>
+    <a href="{{ url_for('set_goals') }}">Definir Metas</a><br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

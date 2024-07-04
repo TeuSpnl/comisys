@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Planilha</title>
+</head>
+<body>
+    <h1>Upload de Planilha</h1>
+    <form method="post" enctype="multipart/form-data">
+        <label for="file">Escolha a planilha (.xlsx):</label><br>
+        <input type="file" id="file" name="file" accept=".xlsx"><br><br>
+        <input type="submit" value="Upload">
+    </form>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
+</body>
+</html>

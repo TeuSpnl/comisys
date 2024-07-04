@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Definir Metas</title>
+</head>
+<body>
+    <h1>Definir Metas</h1>
+    <form method="post">
+        <label for="user_id">Selecionar Vendedor:</label><br>
+        <select id="user_id" name="user_id">
+            {% for seller in sellers %}
+                <option value="{{ seller.id }}">{{ seller.username }}</option>
+            {% endfor %}
+        </select><br><br>
+        
+        <label for="individual_goal">Meta Individual:</label><br>
+        <input type="text" id="individual_goal" name="individual_goal"><br><br>
+        
+        <label for="general_goal">Meta Geral:</label><br>
+        <input type="text" id="general_goal" name="general_goal"><br><br>
+        
+        <input type="submit" value="Definir Metas">
+    </form>
+    <a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
+</body>
+</html>

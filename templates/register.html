@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Register</title>
+</head>
+<body>
+    <h1>Registro</h1>
+    <form method="post">
+        <label for="username">Username:</label><br>
+        <input type="text" id="username" name="username"><br>
+        <label for="password">Password:</label><br>
+        <input type="password" id="password" name="password"><br>
+        <label for="role">Role:</label><br>
+        <select id="role" name="role">
+            <option value="seller">Seller</option>
+            <option value="master">Master</option>
+        </select><br><br>
+        <input type="submit" value="Register">
+    </form>
+    <a href="{{ url_for('index') }}">Voltar</a>
+</body>
+</html>
