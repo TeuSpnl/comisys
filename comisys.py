@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
 
@@ -102,7 +102,7 @@ def register():
         conn.close()
 
         flash('Cadastro realizado com sucesso!')
-        return redirect(url_for('login'))
+        # return redirect(url_for('login'))
 
     return render_template('register.html')
 
@@ -193,6 +193,7 @@ def dashboard():
                                company_percentage=company_percentage,
                                user_id=user_id,
                                general_goal=general_goal,
+                               individual_goal=individual_goal,
                                vendas=vendas)
     elif user_role == 'master':
         cursor.execute('SELECT id, username FROM Users WHERE role = "seller"')
@@ -244,29 +245,58 @@ def seller_dashboard(seller_id):
 
     # Obter vendas do vendedor no mês atual
     cursor.execute('''
-        SELECT date, amount 
+        SELECT id, date, amount 
         FROM Sales 
         WHERE user_id = ? 
         AND strftime('%m', date) = strftime('%m', 'now') 
         AND strftime('%Y', date) = strftime('%Y', 'now')
     ''', (seller_id,))
     vendas = cursor.fetchall()
-    
+
     conn.close()
 
     individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
     company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
 
     return render_template(
-        'seller_dashboard.html',
-        total_sales=total_sales,
+        'seller_dashboard.html', total_sales=total_sales,
         total_company_sales=total_company_sales,
         individual_percentage=individual_percentage,
         company_percentage=company_percentage,
         user_id=seller_id,
         general_goal=general_goal,
-        vendas=vendas)
+        vendas=vendas,
+        individual_goal=individual_goal)
 
+
+@app.route('/delete_sale/<int:sale_id>', methods=['POST'])
+def delete_sale(sale_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM Sales WHERE id = ?', (sale_id,))
+    conn.commit()
+    conn.close()
+
+    flash('Venda deletada com sucesso!', 'success')
+    return redirect(request.referrer)
+
+
+@app.route('/delete_all_sales/<int:seller_id>', methods=['POST'])
+def delete_all_sales(seller_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM Sales WHERE user_id = ?', (seller_id,))
+    conn.commit()
+    conn.close()
+
+    flash('Todas as vendas foram deletadas com sucesso!', 'success')
+    return redirect(request.referrer)
 
 # Rota para logout
 
@@ -286,20 +316,19 @@ def upload():
 
     if request.method == 'POST':
         if 'file' not in request.files:
-            flash('Nenhum arquivo selecionado')
+            flash('Nenhum arquivo selecionado', 'error')
             return redirect(request.url)
 
         file = request.files['file']
         if file.filename == '':
-            flash('Nenhum arquivo selecionado')
+            flash('Nenhum arquivo selecionado', 'error')
             return redirect(request.url)
 
         if file:
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             process_file(file_path)
-            flash('Arquivo processado com sucesso!')
-            # return redirect(url_for('dashboard'))
+            return redirect(url_for('dashboard'))
 
     return render_template('upload.html')
 
@@ -310,17 +339,19 @@ def process_file(file_path):
 
         # Verificar se as colunas necessárias estão presentes
         required_columns = {'data', 'valor', 'id_vendedor'}
-        if not required_columns.issubset(df.columns):
-            flash('Faltam colunas necessárias na planilha.')
+        missing_columns = required_columns - set(df.columns)
+        if missing_columns:
+            flash(f'A planilha está faltando as seguintes colunas: {", ".join(missing_columns)}', 'error')
             return
 
-        # Verificar se as colunas estão no formato correto
+        # Verificar se as colunas estão no formato correto e converter a data
         df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
         df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
         df['id_vendedor'] = pd.to_numeric(df['id_vendedor'], errors='coerce')
 
         if df['data'].isnull().any() or df['valor'].isnull().any() or df['id_vendedor'].isnull().any():
-            flash('A planilha contém dados inválidos.')
+            invalid_columns = df.columns[df.isnull().any()].tolist()
+            flash(f'A planilha contém dados inválidos nas seguintes colunas: {", ".join(invalid_columns)}', 'error')
             return
 
         conn = get_db_connection()
@@ -330,19 +361,20 @@ def process_file(file_path):
             cursor.execute('''
                 INSERT INTO Sales (date, amount, user_id)
                 VALUES (?, ?, ?)
-            ''', (row['data'], row['valor'], row['id_vendedor']))
+            ''', (row['data'].strftime('%Y-%m-%d'), row['valor'], row['id_vendedor']))
 
         conn.commit()
         conn.close()
 
-        flash('Arquivo processado com sucesso!')
+        flash('Planilha processada com sucesso!', 'success')
     except Exception as e:
-        flash(f'Ocorreu um erro ao processar o arquivo: {e}')
+        flash(f'Ocorreu um erro ao processar o arquivo: {e}', 'error')
 
 
 # Rota para definir metas
 
 
+# Rota para definir metas
 @app.route('/set_goals', methods=['GET', 'POST'])
 def set_goals():
     if 'user_id' not in session or session['role'] != 'master':
@@ -356,33 +388,76 @@ def set_goals():
         general_goal = request.form['general_goal']
         user_id = request.form['user_id']
 
+        if not individual_goal and not general_goal:
+            flash('Preencha pelo menos um dos campos de metas.', 'error')
+            return redirect(request.url)
+
         # Atualizar ou inserir meta individual
-        cursor.execute('SELECT * FROM IndividualGoals WHERE user_id = ?', (user_id,))
-        if cursor.fetchone():
-            cursor.execute('UPDATE IndividualGoals SET goal = ? WHERE user_id = ?', (individual_goal, user_id))
-        else:
-            cursor.execute('INSERT INTO IndividualGoals (user_id, goal) VALUES (?, ?)', (user_id, individual_goal))
+        if individual_goal:
+            cursor.execute('SELECT * FROM IndividualGoals WHERE user_id = ?', (user_id,))
+            if cursor.fetchone():
+                cursor.execute('UPDATE IndividualGoals SET goal = ? WHERE user_id = ?', (individual_goal, user_id))
+            else:
+                cursor.execute('INSERT INTO IndividualGoals (user_id, goal) VALUES (?, ?)', (user_id, individual_goal))
 
         # Atualizar meta geral (apenas uma entrada)
-        cursor.execute('SELECT * FROM GeneralGoals')
-        if cursor.fetchone():
-            cursor.execute('UPDATE GeneralGoals SET goal = ? WHERE id = 1', (general_goal,))
-        else:
-            cursor.execute('INSERT INTO GeneralGoals (goal) VALUES (?)', (general_goal,))
+        if general_goal:
+            cursor.execute('SELECT * FROM GeneralGoals')
+            if cursor.fetchone():
+                cursor.execute('UPDATE GeneralGoals SET goal = ? WHERE id = 1', (general_goal,))
+            else:
+                cursor.execute('INSERT INTO GeneralGoals (goal) VALUES (?)', (general_goal,))
 
         conn.commit()
         conn.close()
 
-        flash('Metas atualizadas com sucesso!')
-        return redirect(url_for('dashboard'))
+        flash('Metas atualizadas com sucesso!', 'success')
+        return redirect(url_for('set_goals'))
 
-    # Buscar vendedores para selecionar nas metas individuais
+    # Buscar a meta geral atual
+    cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
+    general_goal_row = cursor.fetchone()
+    general_goal = general_goal_row['goal'] if general_goal_row else 0
+
+    # Buscar vendedores e suas metas individuais
     cursor.execute('SELECT id, username FROM Users WHERE role = "seller"')
     sellers = cursor.fetchall()
 
+    cursor.execute('SELECT user_id, goal FROM IndividualGoals')
+    individual_goals = cursor.fetchall()
+    individual_goals_dict = {goal['user_id']: goal['goal'] for goal in individual_goals}
+
+    # Garantir que todos os vendedores tenham um valor de meta, mesmo que seja 0
+    for seller in sellers:
+        if seller['id'] not in individual_goals_dict:
+            individual_goals_dict[seller['id']] = 0
+
     conn.close()
-    return render_template('set_goals.html', sellers=sellers)
+    return render_template('set_goals.html', sellers=sellers,
+                           general_goal=general_goal,
+                           individual_goals=individual_goals_dict)
+
+# Adicionar o filtro de formatação de moeda
+
+
+def format_currency(value):
+    return f'R$ {value:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.')
+
+
+def format_percentage(value):
+    return f'{value:,.2f}%'.replace(',', 'X').replace('X', '.')
+
+# Rota para download do template de vendas
+
+
+@app.route('/download_template')
+def download_template():
+    return send_from_directory(directory='\\\\Servidor\\Users\\Pichau\\Documents\\Drive Comagro', path="Comisys-Template.xlsx", as_attachment=True)
+
+
+app.jinja_env.filters['currency'] = format_currency
+app.jinja_env.filters['percentage'] = format_percentage
 
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)

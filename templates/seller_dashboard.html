@@ -1,33 +1,42 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Painel do Vendedor</title>
-</head>
-<body>
-    <h1>Painel do Vendedor</h1>
-    <p>ID do Vendedor: {{ user_id }}</p>
-    <p>Meta Geral: R$ {{ general_goal }}</p>
-    <p>Faturamento Atual no Mês: R$ {{ total_sales }}</p>
-    <p>Faturamento Total da Empresa no Mês: R$ {{ total_company_sales }}</p>
-    <p>Percentual da Meta Individual Atingido: {{ individual_percentage }}%</p>
-    <p>Percentual da Meta Geral Atingido: {{ company_percentage }}%</p>
-    <p><em>Disclaimer: Os valores serão atualizados e não são definitivos.</em></p>
-    
-    <h2>Vendas do Mês</h2>
-    <table border="1">
-        <tr>
-            <th>Data</th>
-            <th>Valor</th>
-        </tr>
-        {% for venda in vendas %}
-        <tr>
-            <td>{{ venda['date'] }}</td>
-            <td>R$ {{ venda['amount'] }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-    
-    <a href="{{ url_for('logout') }}">Logout</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Painel do Vendedor{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('dashboard') }}">Voltar</a>
+<h1>Painel do Vendedor</h1>
+<p>ID do Vendedor: {{ user_id }}</p>
+<p>Meta Geral: R$ {{ general_goal | float | currency }}</p>
+<p>Meta Individual: R$ {{ individual_goal | float | currency }}</p>
+<p>Faturamento Atual no Mês: R$ {{ total_sales | float | currency }}</p>
+<p>Faturamento Total da Empresa no Mês: R$ {{ total_company_sales | float | currency }}</p>
+<p>Percentual da Meta Individual Atingido: {{ individual_percentage }}%</p>
+<p>Percentual da Meta Geral Atingido: {{ company_percentage }}%</p>
+<p><em>Disclaimer: Os valores serão atualizados e não são definitivos.</em></p>
+
+<h2>Vendas do Mês</h2>
+<table border="1">
+    <tr>
+        <th>Data</th>
+        <th>Valor</th>
+        <th>Ação</th>
+    </tr>
+    {% for venda in vendas %}
+    <tr>
+        <td>{{ venda['date'] }}</td>
+        <td>R$ {{ venda['amount'] | float | currency }}</td>
+        <td>
+            <form action="{{ url_for('delete_sale', sale_id=venda['id']) }}" method="post" style="display:inline;">
+                <button type="submit" onclick="return confirm('Tem certeza que deseja deletar esta venda?');">x</button>
+            </form>
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+
+<form action="{{ url_for('delete_all_sales', seller_id=user_id) }}" method="post">
+    <button type="submit" onclick="return confirm('Tem certeza que deseja deletar todas as vendas deste vendedor?');">Remover Todas as Vendas</button>
+</form>
+
+<a href="{{ url_for('logout') }}">Logout</a>
+{% endblock %}

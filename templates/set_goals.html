@@ -1,27 +1,61 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <title>Definir Metas</title>
-</head>
-<body>
-    <h1>Definir Metas</h1>
-    <form method="post">
-        <label for="user_id">Selecionar Vendedor:</label><br>
-        <select id="user_id" name="user_id">
-            {% for seller in sellers %}
-                <option value="{{ seller.id }}">{{ seller.username }}</option>
-            {% endfor %}
-        </select><br><br>
-        
-        <label for="individual_goal">Meta Individual:</label><br>
-        <input type="text" id="individual_goal" name="individual_goal"><br><br>
-        
-        <label for="general_goal">Meta Geral:</label><br>
-        <input type="text" id="general_goal" name="general_goal"><br><br>
-        
-        <input type="submit" value="Definir Metas">
-    </form>
-    <a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
-</body>
-</html>
+{% extends "base.html" %}
+
+{% block title %}Definir Metas{% endblock %}
+
+{% block content %}
+<h1>Definir Metas</h1>
+<p>Meta Geral Atual:  {{ general_goal | float | currency }}</p>
+<form method="post" onsubmit="return validateForm()">
+    <label for="user_id">Selecionar Vendedor:</label><br>
+    <select id="user_id" name="user_id" onchange="updateIndividualGoal()">
+        {% for seller in sellers %}
+            <option value="{{ seller.id }}">{{ seller.username }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <label for="individual_goal">Meta Individual:</label><br>
+    <input type="text" id="individual_goal" name="individual_goal"><br><br>
+
+    <label for="general_goal">Meta Geral:</label><br>
+    <input type="text" id="general_goal" name="general_goal"><br><br>
+
+    <input type="submit" value="Definir Metas">
+</form>
+<a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
+
+<script>
+    const individualGoals = JSON.parse('{{ individual_goals | tojson | safe }}');
+    
+    function updateIndividualGoal() {
+        const userId = document.getElementById('user_id').value;
+        const individualGoalInput = document.getElementById('individual_goal');
+        individualGoalInput.value = individualGoals[userId] ? formatCurrency(individualGoals[userId]) : '';
+    }
+
+    function updateGlobalGoal() {
+        const generalGoalInput = document.getElementById('general_goal');
+        generalGoalInput.value = '{{ general_goal | float | currency }}';
+    }
+
+    // Inicializa a meta individual com a meta do primeiro usuário
+    document.addEventListener('DOMContentLoaded', function() {
+        updateIndividualGoal();
+        updateGlobalGoal();
+    });
+
+    function validateForm() {
+        var individualGoal = document.getElementById('individual_goal').value;
+        var generalGoal = document.getElementById('general_goal').value;
+
+        if (!individualGoal && !generalGoal) {
+            alert('Preencha pelo menos um dos campos de metas.');
+            return false;
+        }
+        return true;
+    }
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+    }
+</script>
+{% endblock %}
