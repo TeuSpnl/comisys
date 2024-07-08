@@ -4,14 +4,18 @@
 
 {% block content %}
 <h1>Painel do Usuário Master</h1>
-<p>Meta Geral: R$ {{ general_goal | float | currency }}</p>
-<p>IDs dos Vendedores:</p>
+<p>Meta Geral: {{ general_goal | float | currency }}</p>
+<p>Vendedores:</p>
 <ul>
     {% for seller in sellers %}
         <li>
-            <a href="{{ url_for('seller_dashboard', seller_id=seller.id) }}">
-                ID: {{ seller.id }} - Nome: {{ seller.username }}
-            </a>
+            <a href="{{ url_for('seller_dashboard', seller_id=seller.id) }}">{{ seller.username }}</a>
+            <form action="{{ url_for('delete_seller', seller_id=seller.id) }}" method="post" style="display:inline;">
+                <button type="submit" onclick="return confirm('Tem certeza que deseja deletar este vendedor?');">Deletar</button>
+            </form>
+            <form action="{{ url_for('update_password', seller_id=seller.id) }}" method="get" style="display:inline;">
+                <button type="submit">Atualizar Senha</button>
+            </form>
         </li>
         <br>
     {% endfor %}
@@ -19,6 +23,6 @@
 <p>Implementar funcionalidades de cadastro de metas e upload de planilhas.</p>
 <a href="{{ url_for('upload') }}">Upload de Planilha</a><br>
 <a href="{{ url_for('set_goals') }}">Definir Metas</a><br>
-<a href="{{ url_for('register') }}">Cadastrar Usuário</a><br>
+<a href="{{ url_for('register') }}">Cadastrar usuário</a><br>
 <a href="{{ url_for('logout') }}">Logout</a>
 {% endblock %}

@@ -3,6 +3,7 @@ import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
 from werkzeug.security import generate_password_hash, check_password_hash
 import pandas as pd
+import unicodedata
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -33,7 +34,8 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL,
         password TEXT NOT NULL,
-        role TEXT NOT NULL  -- 'seller' or 'master'
+        name TEXT NOT NULL,  -- Nome completo do usuário
+        role TEXT NOT NULL  -- 'seller' ou 'master'
     );
     ''')
 
@@ -62,6 +64,7 @@ def init_db():
         date DATE NOT NULL,
         amount REAL NOT NULL,
         user_id INTEGER NOT NULL,
+        order_number TEXT NOT NULL,
         FOREIGN KEY(user_id) REFERENCES Users(id)
     );
     ''')
@@ -85,26 +88,71 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        name = request.form['name']
         role = request.form['role']
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO Users (username, password, role) VALUES (?, ?, ?)',
-                       (username, hashed_password, role))
+        cursor.execute('INSERT INTO Users (username, password, name, role) VALUES (?, ?, ?, ?)',
+                       (username, hashed_password, name, role))
         conn.commit()
         conn.close()
 
-        flash('Cadastro realizado com sucesso!')
-        # return redirect(url_for('login'))
+        flash('Cadastro realizado com sucesso!', 'success')
 
     return render_template('register.html')
+
+
+@app.route('/delete_seller/<int:seller_id>', methods=['POST'])
+def delete_seller(seller_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM Users WHERE id = ? AND role = "seller"', (seller_id,))
+    conn.commit()
+    conn.close()
+
+    flash('Vendedor deletado com sucesso!', 'success')
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/update_password/<int:seller_id>', methods=['GET', 'POST'])
+def update_password(seller_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('login'))
+
+    if request.method == 'POST':
+        new_password = request.form['new_password']
+        hashed_password = generate_password_hash(new_password, method='pbkdf2:sha256')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute('UPDATE Users SET password = ? WHERE id = ? AND role = "seller"', (hashed_password, seller_id))
+        conn.commit()
+        conn.close()
+
+        flash('Senha do vendedor atualizada com sucesso!', 'success')
+        return redirect(url_for('dashboard'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT username FROM Users WHERE id = ? AND role = "seller"', (seller_id,))
+    seller = cursor.fetchone()
+    conn.close()
+
+    if not seller:
+        flash('Vendedor não encontrado!', 'error')
+        return redirect(url_for('dashboard'))
+
+    return render_template('update_password.html', seller=seller)
+
 
 # Rota para login
 
@@ -127,7 +175,7 @@ def login():
             session['role'] = user['role']
             return redirect(url_for('dashboard'))
         else:
-            flash('Login inválido, verifique suas credenciais.')
+            flash('Login inválido, verifique suas credenciais.', 'error')
 
     return render_template('login.html')
 
@@ -146,6 +194,9 @@ def dashboard():
     cursor = conn.cursor()
 
     if user_role == 'seller':
+        cursor.execute('SELECT name FROM Users WHERE id = ?', (user_id,))
+        username = cursor.fetchone()['name']
+
         cursor.execute('''
             SELECT SUM(amount) AS total_sales 
             FROM Sales 
@@ -154,7 +205,7 @@ def dashboard():
             AND strftime('%Y', date) = strftime('%Y', 'now')
         ''', (user_id,))
         total_sales_row = cursor.fetchone()
-        total_sales = total_sales_row['total_sales'] if total_sales_row['total_sales'] and total_sales_row['total_sales'] else 0
+        total_sales = total_sales_row['total_sales'] if total_sales_row and total_sales_row['total_sales'] else 0
 
         cursor.execute('SELECT goal FROM IndividualGoals WHERE user_id = ?', (user_id,))
         individual_goal_row = cursor.fetchone()
@@ -175,7 +226,7 @@ def dashboard():
 
         # Obter vendas do vendedor no mês atual
         cursor.execute('''
-            SELECT date, amount 
+            SELECT date, amount, order_number 
             FROM Sales 
             WHERE user_id = ? 
             AND strftime('%m', date) = strftime('%m', 'now') 
@@ -189,14 +240,16 @@ def dashboard():
         company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
 
         return render_template('seller_dashboard.html', total_sales=total_sales,
-                               total_company_sales=total_company_sales, individual_percentage=individual_percentage,
+                               total_company_sales=total_company_sales,
+                               individual_percentage=individual_percentage,
                                company_percentage=company_percentage,
                                user_id=user_id,
+                               username=username,
                                general_goal=general_goal,
-                               individual_goal=individual_goal,
-                               vendas=vendas)
+                               vendas=vendas,
+                               individual_goal=individual_goal)
     elif user_role == 'master':
-        cursor.execute('SELECT id, username FROM Users WHERE role = "seller"')
+        cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller"')
         sellers = cursor.fetchall()
 
         cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
@@ -245,7 +298,7 @@ def seller_dashboard(seller_id):
 
     # Obter vendas do vendedor no mês atual
     cursor.execute('''
-        SELECT id, date, amount 
+        SELECT id, date, amount, order_number 
         FROM Sales 
         WHERE user_id = ? 
         AND strftime('%m', date) = strftime('%m', 'now') 
@@ -253,10 +306,15 @@ def seller_dashboard(seller_id):
     ''', (seller_id,))
     vendas = cursor.fetchall()
 
+    # Obter vendedores do banco de dados
+    cursor.execute('''SELECT name FROM Users WHERE id = ?''', (seller_id,))
+    name = cursor.fetchall()
+    
     conn.close()
 
     individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
     company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
+
 
     return render_template(
         'seller_dashboard.html', total_sales=total_sales,
@@ -266,6 +324,7 @@ def seller_dashboard(seller_id):
         user_id=seller_id,
         general_goal=general_goal,
         vendas=vendas,
+        username=name[0]['name'],
         individual_goal=individual_goal)
 
 
@@ -328,40 +387,80 @@ def upload():
             file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
             file.save(file_path)
             process_file(file_path)
-            return redirect(url_for('dashboard'))
+            # return redirect(url_for('dashboard'))
 
     return render_template('upload.html')
 
 
 def process_file(file_path):
     try:
-        df = pd.read_excel(file_path)
+        df = pd.read_excel(file_path, header=None)
 
-        # Verificar se as colunas necessárias estão presentes
-        required_columns = {'data', 'valor', 'id_vendedor'}
+        # Identificar a linha inicial da tabela
+        start_row = None
+        for i, row in df.iterrows():
+            if 'data' in row.astype(str).str.lower().tolist():
+                start_row = i
+                break
+
+        if start_row is None:
+            flash('Não foi possível identificar a linha inicial da tabela.', 'error')
+            return
+
+        df = pd.read_excel(file_path, skiprows=start_row)
+
+        # Renomear as colunas para facilitar o acesso
+        df.columns = [str(col).strip().lower() for col in df.columns]
+
+        # Identificar o fim da tabela com base na consistência dos dados
+        df = df.dropna(how='all')  # Remove linhas completamente vazias
+        df = df.reset_index(drop=True)
+
+        # Filtrar colunas necessárias
+        required_columns = {'data', 'valor total', 'nº ped/ os/ prq', 'vendedor', 'cliente'}
         missing_columns = required_columns - set(df.columns)
         if missing_columns:
             flash(f'A planilha está faltando as seguintes colunas: {", ".join(missing_columns)}', 'error')
             return
+        
 
-        # Verificar se as colunas estão no formato correto e converter a data
+        # Converter e limpar dados
         df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
-        df['valor'] = pd.to_numeric(df['valor'], errors='coerce')
-        df['id_vendedor'] = pd.to_numeric(df['id_vendedor'], errors='coerce')
+        df['valor total'] = pd.to_numeric(df['valor total'], errors='coerce')
+        df['nº ped/ os/ prq'] = df['nº ped/ os/ prq'].astype(str)
+        df['vendedor'] = df['vendedor'].astype(str)
+        df['cliente'] = df['cliente'].astype(str)
 
-        if df['data'].isnull().any() or df['valor'].isnull().any() or df['id_vendedor'].isnull().any():
-            invalid_columns = df.columns[df.isnull().any()].tolist()
-            flash(f'A planilha contém dados inválidos nas seguintes colunas: {", ".join(invalid_columns)}', 'error')
-            return
+        # Remover linhas onde qualquer das colunas principais é NaN
+        df = df.dropna(subset=['data', 'valor total', 'nº ped/ os/ prq', 'vendedor', 'cliente'])
+
+        # Filtrar pedidos da Comagro
+        comagro_terms = ['comagro', 'comagro oficina', 'comagro peças e serviços']
+        df = df[~df['cliente'].str.lower().str.contains('|'.join(comagro_terms), na=False)]
+
+        # Manter o pedido mais recente
+        df = df.sort_values('data').drop_duplicates('nº ped/ os/ prq', keep='last')
 
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Obter vendedores do banco de dados
+        cursor.execute('SELECT id, name FROM Users WHERE role = "seller"')
+        sellers = cursor.fetchall()
+        sellers_dict = {remove_accents(seller['name'].lower()): seller['id'] for seller in sellers}
+
+        print(df['nº ped/ os/ prq'])
+        
         for index, row in df.iterrows():
+            vendedor_nome = remove_accents(row['vendedor'].lower())
+            if vendedor_nome not in sellers_dict:
+                continue
+            user_id = sellers_dict[vendedor_nome]
+
             cursor.execute('''
-                INSERT INTO Sales (date, amount, user_id)
-                VALUES (?, ?, ?)
-            ''', (row['data'].strftime('%Y-%m-%d'), row['valor'], row['id_vendedor']))
+                INSERT INTO Sales (date, amount, user_id, order_number)
+                VALUES (?, ?, ?, ?)
+            ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
 
         conn.commit()
         conn.close()
@@ -450,9 +549,9 @@ def format_percentage(value):
 # Rota para download do template de vendas
 
 
-@app.route('/download_template')
-def download_template():
-    return send_from_directory(directory='\\\\Servidor\\Users\\Pichau\\Documents\\Drive Comagro', path="Comisys-Template.xlsx", as_attachment=True)
+def remove_accents(input_str):
+    nfkd_form = unicodedata.normalize('NFKD', input_str)
+    return u"".join([c for c in nfkd_form if not unicodedata.combining(c)])
 
 
 app.jinja_env.filters['currency'] = format_currency

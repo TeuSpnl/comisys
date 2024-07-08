@@ -4,11 +4,18 @@
 
 {% block content %}
 <h1>Upload de Planilha</h1>
-<a href="{{ url_for('download_template') }}">Baixar Template de Vendas</a><br>
 <form method="post" enctype="multipart/form-data">
     <label for="file">Escolha a planilha (.xlsx):</label><br>
     <input type="file" id="file" name="file" accept=".xlsx"><br><br>
     <input type="submit" value="Upload">
 </form>
 <a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
-{% endblock %}
+
+<!-- {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="flash-message flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+{% endwith %}
+{% endblock %} -->
