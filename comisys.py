@@ -1,3 +1,4 @@
+import datetime
 import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
@@ -88,6 +89,9 @@ def index():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('dashboard'))
+
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
@@ -111,7 +115,7 @@ def register():
 @app.route('/delete_seller/<int:seller_id>', methods=['POST'])
 def delete_seller(seller_id):
     if 'user_id' not in session or session['role'] != 'master':
-        return redirect(url_for('login'))
+        return redirect(url_for('dashboard'))
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -198,10 +202,10 @@ def dashboard():
         username = cursor.fetchone()['name']
 
         cursor.execute('''
-            SELECT SUM(amount) AS total_sales 
-            FROM Sales 
-            WHERE user_id = ? 
-            AND strftime('%m', date) = strftime('%m', 'now') 
+            SELECT SUM(amount) AS total_sales
+            FROM Sales
+            WHERE user_id = ?
+            AND strftime('%m', date) = strftime('%m', 'now')
             AND strftime('%Y', date) = strftime('%Y', 'now')
         ''', (user_id,))
         total_sales_row = cursor.fetchone()
@@ -212,9 +216,9 @@ def dashboard():
         individual_goal = individual_goal_row['goal'] if individual_goal_row else 0
 
         cursor.execute('''
-            SELECT SUM(amount) AS total_company_sales 
-            FROM Sales 
-            WHERE strftime('%m', date) = strftime('%m', 'now') 
+            SELECT SUM(amount) AS total_company_sales
+            FROM Sales
+            WHERE strftime('%m', date) = strftime('%m', 'now')
             AND strftime('%Y', date) = strftime('%Y', 'now')
         ''')
         total_company_sales_row = cursor.fetchone()
@@ -224,13 +228,14 @@ def dashboard():
         general_goal_row = cursor.fetchone()
         general_goal = general_goal_row['goal'] if general_goal_row else 0
 
-        # Obter vendas do vendedor no mês atual
+        # Obter vendas do vendedor no mês atual, ordenadas por data
         cursor.execute('''
-            SELECT date, amount, order_number 
-            FROM Sales 
-            WHERE user_id = ? 
-            AND strftime('%m', date) = strftime('%m', 'now') 
+            SELECT id, date, amount, order_number
+            FROM Sales
+            WHERE user_id = ?
+            AND strftime('%m', date) = strftime('%m', 'now')
             AND strftime('%Y', date) = strftime('%Y', 'now')
+            ORDER BY date DESC
         ''', (user_id,))
         vendas = cursor.fetchall()
 
@@ -239,7 +244,22 @@ def dashboard():
         individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
         company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
 
-        return render_template('seller_dashboard.html', total_sales=total_sales,
+        # Calcular a comissão com base nas metas individuais atingidas
+        commission_rate = 0.01
+        bonus_rate = 0
+        if total_sales >= 225000:
+            bonus_rate += 0.006
+        elif total_sales >= 170000:
+            bonus_rate += 0.004
+        elif total_sales >= 130000:
+            bonus_rate += 0.003
+
+        commission = total_sales * commission_rate
+        bonus = total_sales * bonus_rate
+
+        return render_template('seller_dashboard.html',
+                               user_role=user_role,
+                               total_sales=total_sales,
                                total_company_sales=total_company_sales,
                                individual_percentage=individual_percentage,
                                company_percentage=company_percentage,
@@ -247,6 +267,8 @@ def dashboard():
                                username=username,
                                general_goal=general_goal,
                                vendas=vendas,
+                               bonus=bonus,
+                               commission=commission,
                                individual_goal=individual_goal)
     elif user_role == 'master':
         cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller"')
@@ -270,10 +292,10 @@ def seller_dashboard(seller_id):
     cursor = conn.cursor()
 
     cursor.execute('''
-        SELECT SUM(amount) AS total_sales 
-        FROM Sales 
-        WHERE user_id = ? 
-        AND strftime('%m', date) = strftime('%m', 'now') 
+        SELECT SUM(amount) AS total_sales
+        FROM Sales
+        WHERE user_id = ?
+        AND strftime('%m', date) = strftime('%m', 'now')
         AND strftime('%Y', date) = strftime('%Y', 'now')
     ''', (seller_id,))
     total_sales_row = cursor.fetchone()
@@ -284,9 +306,9 @@ def seller_dashboard(seller_id):
     individual_goal = individual_goal_row['goal'] if individual_goal_row else 0
 
     cursor.execute('''
-        SELECT SUM(amount) AS total_company_sales 
-        FROM Sales 
-        WHERE strftime('%m', date) = strftime('%m', 'now') 
+        SELECT SUM(amount) AS total_company_sales
+        FROM Sales
+        WHERE strftime('%m', date) = strftime('%m', 'now')
         AND strftime('%Y', date) = strftime('%Y', 'now')
     ''')
     total_company_sales_row = cursor.fetchone()
@@ -296,34 +318,51 @@ def seller_dashboard(seller_id):
     general_goal_row = cursor.fetchone()
     general_goal = general_goal_row['goal'] if general_goal_row else 0
 
-    # Obter vendas do vendedor no mês atual
+    # Obter vendas do vendedor no mês atual, ordenadas por data
     cursor.execute('''
-        SELECT id, date, amount, order_number 
-        FROM Sales 
-        WHERE user_id = ? 
-        AND strftime('%m', date) = strftime('%m', 'now') 
+        SELECT id, date, amount, order_number
+        FROM Sales
+        WHERE user_id = ?
+        AND strftime('%m', date) = strftime('%m', 'now')
         AND strftime('%Y', date) = strftime('%Y', 'now')
+        ORDER BY order_number DESC
     ''', (seller_id,))
     vendas = cursor.fetchall()
 
     # Obter vendedores do banco de dados
     cursor.execute('''SELECT name FROM Users WHERE id = ?''', (seller_id,))
     name = cursor.fetchall()
-    
+
     conn.close()
 
     individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
     company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
 
+    # Calcular a comissão com base nas metas individuais atingidas
+    commission_rate = 0.01
+    bonus_rate = 0
+    if total_sales >= 225000:
+        bonus_rate += 0.006
+    elif total_sales >= 170000:
+        bonus_rate += 0.004
+    elif total_sales >= 130000:
+        bonus_rate += 0.003
+
+    commission = total_sales * commission_rate
+    bonus = total_sales * bonus_rate
 
     return render_template(
-        'seller_dashboard.html', total_sales=total_sales,
+        'seller_dashboard.html',
+        user_role=session['role'],
+        total_sales=total_sales,
         total_company_sales=total_company_sales,
         individual_percentage=individual_percentage,
         company_percentage=company_percentage,
         user_id=seller_id,
         general_goal=general_goal,
         vendas=vendas,
+        commission=commission,
+        bonus=bonus,
         username=name[0]['name'],
         individual_goal=individual_goal)
 
@@ -422,7 +461,6 @@ def process_file(file_path):
         if missing_columns:
             flash(f'A planilha está faltando as seguintes colunas: {", ".join(missing_columns)}', 'error')
             return
-        
 
         # Converter e limpar dados
         df['data'] = pd.to_datetime(df['data'], format='%d/%m/%Y', errors='coerce')
@@ -438,9 +476,6 @@ def process_file(file_path):
         comagro_terms = ['comagro', 'comagro oficina', 'comagro peças e serviços']
         df = df[~df['cliente'].str.lower().str.contains('|'.join(comagro_terms), na=False)]
 
-        # Manter o pedido mais recente
-        df = df.sort_values('data').drop_duplicates('nº ped/ os/ prq', keep='last')
-
         conn = get_db_connection()
         cursor = conn.cursor()
 
@@ -449,18 +484,47 @@ def process_file(file_path):
         sellers = cursor.fetchall()
         sellers_dict = {remove_accents(seller['name'].lower()): seller['id'] for seller in sellers}
 
-        print(df['nº ped/ os/ prq'])
-        
         for index, row in df.iterrows():
             vendedor_nome = remove_accents(row['vendedor'].lower())
             if vendedor_nome not in sellers_dict:
                 continue
             user_id = sellers_dict[vendedor_nome]
 
+            # Verificar se o pedido já existe
+            cursor.execute('SELECT id, date FROM Sales WHERE order_number = ?', (row['nº ped/ os/ prq'],))
+            existing_sales = cursor.fetchall()
+
+            if existing_sales:
+                # Atualizar o pedido se a data for mais recente
+                for sale in existing_sales:
+
+                    if row['data'] >= datetime.datetime.strptime(sale['date'], '%Y-%m-%d'):
+                        cursor.execute('DELETE FROM Sales WHERE id = ?', (sale['id'],))
+                cursor.execute('''
+                    INSERT INTO Sales (date, amount, user_id, order_number)
+                    VALUES (?, ?, ?, ?)
+                ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
+            else:
+                cursor.execute('''
+                    INSERT INTO Sales (date, amount, user_id, order_number)
+                    VALUES (?, ?, ?, ?)
+                ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
+
+        conn.commit()
+
+        cursor.execute('''
+            SELECT order_number, MAX(date) as latest_date
+            FROM Sales
+            GROUP BY order_number
+            HAVING COUNT(*) > 1
+        ''')
+        duplicate_sales = cursor.fetchall()
+
+        for sale in duplicate_sales:
             cursor.execute('''
-                INSERT INTO Sales (date, amount, user_id, order_number)
-                VALUES (?, ?, ?, ?)
-            ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
+                DELETE FROM Sales
+                WHERE order_number = ? AND date < ?
+            ''', (sale['order_number'], sale['latest_date']))
 
         conn.commit()
         conn.close()
@@ -508,7 +572,6 @@ def set_goals():
                 cursor.execute('INSERT INTO GeneralGoals (goal) VALUES (?)', (general_goal,))
 
         conn.commit()
-        conn.close()
 
         flash('Metas atualizadas com sucesso!', 'success')
         return redirect(url_for('set_goals'))
