@@ -9,7 +9,7 @@
     <input type="file" id="file" name="file" accept=".xlsx"><br><br>
     <input type="submit" value="Upload">
 </form>
-<a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
+<a href="{{ url_for('dashboards.dashboard') }}">Voltar ao Dashboard</a>
 
 <!-- {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}

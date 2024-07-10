@@ -21,7 +21,7 @@
 
     <input type="submit" value="Definir Metas">
 </form>
-<a href="{{ url_for('dashboard') }}">Voltar ao Dashboard</a>
+<a href="{{ url_for('dashboards.dashboard') }}">Voltar ao Dashboard</a>
 
 <script>
     const individualGoals = JSON.parse('{{ individual_goals | tojson | safe }}');

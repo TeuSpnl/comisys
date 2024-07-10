@@ -7,8 +7,8 @@
 <p>Nome do vendedor: {{username}}</p>
 <p>Meta Geral: {{ general_goal | float | currency }}</p>
 <p>Meta Individual: {{ individual_goal | float | currency }}</p>
-<p>Faturamento Atual no Mês: {{ total_sales | float | currency }}</p>
 <p>Faturamento Total da Empresa no Mês: {{ total_company_sales | float | currency }}</p>
+<p>Faturamento Atual no Mês: {{ total_sales | float | currency }}</p>
 <p>Percentual da Meta Individual Atingido: {{ individual_percentage | float | percentage}}</p>
 <p>Percentual da Meta Geral Atingido: {{ company_percentage | float | percentage}}</p>
 <p>Comissão do Mês: {{ commission | float | currency }}</p>
@@ -32,7 +32,7 @@
         <td>{{ venda['amount'] | float | currency }}</td>
         {% if user_role == 'master' %}
         <td>
-            <form action="{{ url_for('delete_sale', sale_id=venda['id']) }}" method="post" style="display:inline;">
+            <form action="{{ url_for('sales.delete_sale', sale_id=venda['id']) }}" method="post" style="display:inline;">
                 <button type="submit" onclick="return confirm('Tem certeza que deseja deletar esta venda?');">x</button>
             </form>
         </td>
@@ -42,15 +42,15 @@
 </table>
 
 {% if user_role == 'master' %}
-<form action="{{ url_for('delete_all_sales', seller_id=user_id) }}" method="post">
+<form action="{{ url_for('sales.delete_all_sales', seller_id=user_id) }}" method="post">
     <button type="submit" onclick="return confirm('Tem certeza que deseja deletar todas as vendas deste vendedor?');">Remover Todas as Vendas</button>
 </form>
 {% endif %}
 
 {% if user_role == 'master' %}
-<a href="{{ url_for('dashboard') }}">Voltar</a>
+<a href="{{ url_for('dashboards.dashboard') }}">Voltar</a>
 {% elif user_role == 'seller' %}
-<a href="{{ url_for('logout') }}">Logout</a>
+<a href="{{ url_for('users.logout') }}">Logout</a>
 {% endif %}
 
 {% endblock %}

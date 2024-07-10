@@ -9,11 +9,11 @@
 <ul>
     {% for seller in sellers %}
         <li>
-            <a href="{{ url_for('seller_dashboard', seller_id=seller.id) }}">{{ seller.username }}</a>
-            <form action="{{ url_for('delete_seller', seller_id=seller.id) }}" method="post" style="display:inline;">
+            <a href="{{ url_for('dashboards.seller_dashboard', seller_id=seller.id) }}">{{ seller.username }}</a>
+            <form action="{{ url_for('users.delete_seller', seller_id=seller.id) }}" method="post" style="display:inline;">
                 <button type="submit" onclick="return confirm('Tem certeza que deseja deletar este vendedor?');">Deletar</button>
             </form>
-            <form action="{{ url_for('update_password', seller_id=seller.id) }}" method="get" style="display:inline;">
+            <form action="{{ url_for('users.update_password', seller_id=seller.id) }}" method="get" style="display:inline;">
                 <button type="submit">Atualizar Senha</button>
             </form>
         </li>
@@ -21,8 +21,8 @@
     {% endfor %}
 </ul>
 <p>Implementar funcionalidades de cadastro de metas e upload de planilhas.</p>
-<a href="{{ url_for('upload') }}">Upload de Planilha</a><br>
+<a href="{{ url_for('sales.upload') }}">Upload de Planilha</a><br>
 <a href="{{ url_for('set_goals') }}">Definir Metas</a><br>
-<a href="{{ url_for('register') }}">Cadastrar usuário</a><br>
-<a href="{{ url_for('logout') }}">Logout</a>
+<a href="{{ url_for('users.register') }}">Cadastrar usuário</a><br>
+<a href="{{ url_for('users.logout') }}">Logout</a>
 {% endblock %}
