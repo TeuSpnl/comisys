@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session, flash
+from flask import Blueprint, render_template, redirect, url_for, session
 from ..db import get_db_connection
 from datetime import datetime
 
@@ -60,20 +60,30 @@ def dashboard():
         ''', (user_id,))
         vendas = cursor.fetchall()
 
+        cursor.execute('SELECT branch FROM Users WHERE user_id = ?', (user_id,))
+        user_branch_row = cursor.fetchone()
+        user_branch = user_branch_row['goal'] if user_branch_row else 'N/A'
+
         conn.close()
 
         individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
         company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
 
-        # Calcular a comissão com base nas metas individuais atingidas
-        commission_rate = 0.01
-        bonus_rate = 0
-        if total_sales >= 225000:
-            bonus_rate += 0.006
-        elif total_sales >= 170000:
-            bonus_rate += 0.004
-        elif total_sales >= 130000:
-            bonus_rate += 0.003
+        if user_branch.upper() == 'LOJA':
+            # Calcular a comissão com base nas metas individuais atingidas
+            commission_rate = 0.01
+            bonus_rate = 0
+            if total_sales >= 225000:
+                bonus_rate += 0.006
+            elif total_sales >= 170000:
+                bonus_rate += 0.004
+            elif total_sales >= 130000:
+                bonus_rate += 0.003
+        elif user_branch.upper() == 'OFICINA':
+            commission_rate = .5
+            bonus_rate = 0
+            if total_sales >= 50000:
+                commission_rate += 0.05
 
         commission = total_sales * commission_rate
         bonus = total_sales * bonus_rate
@@ -151,23 +161,33 @@ def seller_dashboard(seller_id):
     vendas = cursor.fetchall()
 
     # Obter vendedores do banco de dados
-    cursor.execute('''SELECT name FROM Users WHERE id = ?''', (seller_id,))
-    name = cursor.fetchall()
+    cursor.execute('''SELECT name, branch FROM Users WHERE id = ?''', (seller_id,))
+    seller = cursor.fetchall()[0]
+
+    print(seller['branch'])
+    print('Type: ', type(seller))
+
+    seller_branch = seller['branch']
 
     conn.close()
 
     individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
     company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
-
-    # Calcular a comissão com base nas metas individuais atingidas
-    commission_rate = 0.01
-    bonus_rate = 0
-    if total_sales >= 225000:
-        bonus_rate += 0.006
-    elif total_sales >= 170000:
-        bonus_rate += 0.004
-    elif total_sales >= 130000:
-        bonus_rate += 0.003
+    if seller_branch.upper() == 'LOJA':
+        # Calcular a comissão com base nas metas individuais atingidas
+        commission_rate = 0.01
+        bonus_rate = 0
+        if total_sales >= 225000:
+            bonus_rate += 0.006
+        elif total_sales >= 170000:
+            bonus_rate += 0.004
+        elif total_sales >= 130000:
+            bonus_rate += 0.003
+    elif seller_branch.upper() == 'OFICINA':
+        commission_rate = .5
+        bonus_rate = 0
+        if total_sales >= 50000:
+            commission_rate += 0.05
 
     commission = total_sales * commission_rate
     bonus = total_sales * bonus_rate
@@ -184,5 +204,5 @@ def seller_dashboard(seller_id):
         vendas=vendas,
         commission=commission,
         bonus=bonus,
-        username=name[0]['name'],
+        username=seller['name'],
         individual_goal=individual_goal)

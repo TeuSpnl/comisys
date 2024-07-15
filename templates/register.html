@@ -16,6 +16,11 @@
         <option value="seller">Vendedor</option>
         <option value="master">Administrador</option>
     </select><br><br>
+    <label for="branch">Filial:</label>
+    <select id="branch" name="branch" required>
+        <option value="Loja">Loja</option>
+        <option value="Oficina">Oficina</option>
+    </select><br><br>
     <input type="submit" value="Cadastrar">
 </form>
 <a href="{{ url_for('dashboards.dashboard') }}">Voltar ao Dashboard</a>

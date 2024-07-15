@@ -15,6 +15,12 @@
 <p>Bônus do mês: {{ bonus | float | currency }}</p>
 <p><em>OBS: Os valores serão atualizados e não são definitivos.</em></p>
 
+{% if user_role == 'master' %}
+<a href="{{ url_for('dashboards.dashboard') }}">Voltar</a>
+{% elif user_role == 'seller' %}
+<a href="{{ url_for('users.logout') }}">Logout</a>
+{% endif %}
+
 <h2>Vendas do Mês</h2>
 <table border="1">
     <tr>
@@ -45,12 +51,6 @@
 <form action="{{ url_for('sales.delete_all_sales', seller_id=user_id) }}" method="post">
     <button type="submit" onclick="return confirm('Tem certeza que deseja deletar todas as vendas deste vendedor?');">Remover Todas as Vendas</button>
 </form>
-{% endif %}
-
-{% if user_role == 'master' %}
-<a href="{{ url_for('dashboards.dashboard') }}">Voltar</a>
-{% elif user_role == 'seller' %}
-<a href="{{ url_for('users.logout') }}">Logout</a>
 {% endif %}
 
 {% endblock %}

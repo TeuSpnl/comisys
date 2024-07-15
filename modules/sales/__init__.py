@@ -90,6 +90,9 @@ def process_file(file_path):
 
         conn = get_db_connection()
         cursor = conn.cursor()
+        
+        # Limpar a tabela Sales antes de inserir novos dados
+        cursor.execute('DELETE FROM Sales')
 
         # Obter vendedores do banco de dados
         cursor.execute('SELECT id, name FROM Users WHERE role = "seller"')

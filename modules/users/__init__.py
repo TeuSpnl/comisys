@@ -16,13 +16,14 @@ def register():
         password = request.form['password']
         name = request.form['name']
         role = request.form['role']
+        branch = request.form['branch']
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO Users (username, password, name, role) VALUES (?, ?, ?, ?)',
-                       (username, hashed_password, name, role))
+        cursor.execute('INSERT INTO Users (username, password, name, role, branch) VALUES (?, ?, ?, ?, ?)',
+                       (username, hashed_password, name, role, branch))
         conn.commit()
         conn.close()
 
@@ -33,14 +34,14 @@ def register():
 # Rota para deletar vendedores
 
 
-@users_bp.route('/delete_seller/<int:seller_id>', methods=['POST'])
-def delete_seller(seller_id):
+@users_bp.route('/delete_user/<int:seller_id>', methods=['POST'])
+def delete_user(seller_id):
     if 'user_id' not in session or session['role'] != 'master':
         return redirect(url_for('dashboards.dashboard'))
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM Users WHERE id = ? AND role = "seller"', (seller_id,))
+    cursor.execute('DELETE FROM Users WHERE id = ?', (seller_id,))
     conn.commit()
     conn.close()
 

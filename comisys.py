@@ -37,7 +37,8 @@ def init_db():
         username TEXT NOT NULL,
         password TEXT NOT NULL,
         name TEXT NOT NULL,  -- Nome completo do usuário
-        role TEXT NOT NULL  -- 'seller' ou 'master'
+        role TEXT NOT NULL,  -- 'seller' ou 'master'
+        branch TEXT NOT NULL  -- Filial do usuário
     );
     ''')
 
