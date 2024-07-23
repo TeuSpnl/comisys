@@ -4,6 +4,22 @@ from ..db import get_db_connection
 
 users_bp = Blueprint('users', __name__)
 
+# Rota para a tela de usuários
+
+
+@users_bp.route('/users')
+def users():
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('users.login'))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('SELECT * FROM Users')
+    users = cursor.fetchall()
+    conn.close()
+
+    return render_template('users.html', users=users)
+
 
 # Rota para registro de usuários
 @users_bp.route('/register', methods=['GET', 'POST'])
@@ -22,8 +38,22 @@ def register():
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('INSERT INTO Users (username, password, name, role, branch) VALUES (?, ?, ?, ?, ?)',
-                       (username, hashed_password, name, role, branch))
+
+        # Verificar se o pedido já existe
+        cursor.execute('SELECT name, username FROM Users WHERE username = ? OR name = ?', (username, name))
+        existing_users = cursor.fetchall()
+
+        if existing_users:
+            for user in existing_users:
+                if user['username'] == username:
+                    flash('Usuário já cadastrado!', 'error')
+                    return render_template('register.html')
+                if user['name'] == name:
+                    flash(f'Nome já cadastrado! Username: {user['username']}', 'error')
+                    return render_template('register.html')
+        else:
+            cursor.execute('INSERT INTO Users (username, password, name, role, branch) VALUES (?, ?, ?, ?, ?)',
+                           (username, hashed_password, name, role, branch))
         conn.commit()
         conn.close()
 
@@ -31,28 +61,29 @@ def register():
 
     return render_template('register.html')
 
+
 # Rota para deletar vendedores
 
 
-@users_bp.route('/delete_user/<int:seller_id>', methods=['POST'])
-def delete_user(seller_id):
+@users_bp.route('/delete_user/<int:user_id>', methods=['POST'])
+def delete_user(user_id):
     if 'user_id' not in session or session['role'] != 'master':
         return redirect(url_for('dashboards.dashboard'))
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('DELETE FROM Users WHERE id = ?', (seller_id,))
+    cursor.execute('DELETE FROM Users WHERE id = ?', (user_id,))
     conn.commit()
     conn.close()
 
     flash('Vendedor deletado com sucesso!', 'success')
-    return redirect(url_for('dashboards.dashboard'))
+    return redirect(url_for('users.users'))
 
 # Rotas para atualizar senha de usuários
 
 
-@users_bp.route('/update_password/<int:seller_id>', methods=['GET', 'POST'])
-def update_password(seller_id):
+@users_bp.route('/update_password/<int:user_id>', methods=['GET', 'POST'])
+def update_password(user_id):
     if 'user_id' not in session or session['role'] != 'master':
         return redirect(url_for('users.login'))
 
@@ -62,24 +93,32 @@ def update_password(seller_id):
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('UPDATE Users SET password = ? WHERE id = ? AND role = "seller"', (hashed_password, seller_id))
+        cursor.execute('UPDATE Users SET password = ? WHERE id = ?', (hashed_password, user_id))
         conn.commit()
         conn.close()
 
         flash('Senha do vendedor atualizada com sucesso!', 'success')
-        return redirect(url_for('dashboards.dashboard'))
+        return redirect(url_for('users.users'))
+
+# Rota para atualizar a filial de um usuário
+
+
+@users_bp.route('/update_branch/<int:user_id>', methods=['POST'])
+def update_branch(user_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('users.login'))
+
+    new_branch = request.form['new_branch']
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute('SELECT username FROM Users WHERE id = ? AND role = "seller"', (seller_id,))
-    seller = cursor.fetchone()
+    cursor.execute('UPDATE Users SET branch = ? WHERE id = ?', (new_branch, user_id))
+    conn.commit()
     conn.close()
 
-    if not seller:
-        flash('Vendedor não encontrado!', 'error')
-        return redirect(url_for('dashboards.dashboard'))
+    flash('Branch updated successfully!', 'success')
+    return redirect(url_for('users.manage_users'))
 
-    return render_template('update_password.html', seller=seller)
 
 # Rota para login
 

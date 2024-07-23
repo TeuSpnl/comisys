@@ -4,13 +4,13 @@
 
 {% block content %}
 <h1>Painel do Vendedor</h1>
-<p>Nome do vendedor: {{username}}</p>
+<p>Nome: {{user_name}}</p>
 <p>Meta Geral: {{ general_goal | float | currency }}</p>
 <p>Meta Individual: {{ individual_goal | float | currency }}</p>
-<p>Faturamento Total da Empresa no Mês: {{ total_company_sales | float | currency }}</p>
-<p>Faturamento Atual no Mês: {{ total_sales | float | currency }}</p>
+<p>Faturamento Total da {{ user_branch }} no Mês: {{ total_branch_sales | float | currency }}</p>
+<p>Faturamento Atual no Mês: {{ total_seller_sales | float | currency }}</p>
 <p>Percentual da Meta Individual Atingido: {{ individual_percentage | float | percentage}}</p>
-<p>Percentual da Meta Geral Atingido: {{ company_percentage | float | percentage}}</p>
+<p>Percentual da Meta da {{user_branch}} Atingido: {{ branch_percentage | float | percentage}}</p>
 <p>Comissão do Mês: {{ commission | float | currency }}</p>
 <p>Bônus do mês: {{ bonus | float | currency }}</p>
 <p><em>OBS: Os valores serão atualizados e não são definitivos.</em></p>

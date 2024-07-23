@@ -103,48 +103,37 @@ def process_file(file_path):
             vendedor_nome = remove_accents(row['vendedor'].lower())
             user_id = sellers_dict.get(vendedor_nome, None)  # Pode ser None se o vendedor não estiver cadastrado
 
-            # Verificar se o pedido já existe
-            cursor.execute('SELECT id, date FROM Sales WHERE order_number = ?', (row['nº ped/ os/ prq'],))
-            existing_sales = cursor.fetchall()
-
-            if existing_sales:
-                # Atualizar o pedido se a data for mais recente
-                for sale in existing_sales:
-                    if row['data'] >= datetime.datetime.strptime(sale['date'],
-                                                                 '%Y-%m-%d') or row['valor total'] != sale['amount']:
-                        cursor.execute('DELETE FROM Sales WHERE id = ?', (sale['id'],))
-                        cursor.execute('''
-                            INSERT INTO Sales (date, amount, user_id, order_number)
-                            VALUES (?, ?, ?, ?)
-                        ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
-            else:
-                cursor.execute('''
-                    INSERT INTO Sales (date, amount, user_id, order_number)
-                    VALUES (?, ?, ?, ?)
-                ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, row['nº ped/ os/ prq']))
-
-        conn.commit()
-
-        cursor.execute('''
-            SELECT order_number, MAX(date) as latest_date
-            FROM Sales
-            GROUP BY order_number
-            HAVING COUNT(*) > 1
-        ''')
-        duplicate_sales = cursor.fetchall()
-
-        for sale in duplicate_sales:
+            order_number = row['nº ped/ os/ prq']
+            
             cursor.execute('''
-                DELETE FROM Sales
-                WHERE order_number = ? AND date < ?
-            ''', (sale['order_number'], sale['latest_date']))
-
+                INSERT INTO Sales (date, amount, user_id, order_number)
+                VALUES (?, ?, ?, ?)
+            ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
+            
+            # try:
+            #     int_ord_nb = int(float(order_number))
+            #     if int_ord_nb > 100000:
+            #         cursor.execute('''
+            #             INSERT INTO Sales (date, amount, user_id, order_number)
+            #             VALUES (?, ?, ?, ?)
+            #         ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
+                    
+            #         print(f'Inserindo pedido {order_number}')
+            # except ValueError:
+            #     cursor.execute('''
+            #         INSERT INTO Sales (date, amount, user_id, order_number)
+            #         VALUES (?, ?, ?, ?)
+            #     ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
+            # except Exception as e:
+            #     flash(f'Erro ao processar o pedido {order_number}: {e}, {e.__class__}', 'error')
+            #     return
+            
         conn.commit()
         conn.close()
 
         flash('Planilha processada com sucesso!', 'success')
     except Exception as e:
-        flash(f'Ocorreu um erro ao processar o arquivo: {e}', 'error')
+        flash(f'Ocorreu um erro ao processar o arquivo: {e}, {e.__class__}', 'error')
 
 
 # Rota para deletar vendas

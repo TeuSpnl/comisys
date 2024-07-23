@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Cadastrar Usuário{% endblock %}
+
+{% block content %}
+    <h2>Manage Users</h2>
+    
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Branch</th>
+                <th>Role</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user['id'] }}</td>
+                <td>{{ user['username'] }}</td>
+                <td>
+                    {% if user['role'] == 'seller' %}
+                    <a href="{{ url_for('dashboards.dashboard', seller_id=user['id']) }}">{{ user['name'] }}</a>
+                    {% else %}
+                    {{ user['name'] }}
+                    {% endif %}
+                </td>
+                <td>{{ user['branch'] }}</td>
+                <td>{{ user['role'] }}</td>
+                <td>
+                    <form action="{{ url_for('users.delete_user', user_id=user['id']) }}" method="post" style="display:inline;">
+                        <button type="submit">Remover usuário</button>
+                    </form>
+                    <form action="{{ url_for('users.update_password', user_id=user['id']) }}" method="post" style="display:inline;">
+                        <input type="password" name="new_password" placeholder="New Password" required>
+                        <button type="submit">Atualizar senha</button>
+                    </form>
+                    <form action="{{ url_for('users.update_branch', user_id=user['id']) }}" method="post" style="display:inline;">
+                        <select name="new_branch" required>
+                            <option value="Loja" {% if user['branch'] == 'Loja' %}selected{% endif %}>Loja</option>
+                            <option value="Oficina" {% if user['branch'] == 'Oficina' %}selected{% endif %}>Oficina</option>
+                        </select>
+                        <button type="submit">Atualizar filial</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <a href="{{ url_for('users.register') }}">Add User</a>
+    <a href="{{ url_for('dashboards.dashboard') }}">Voltar</a>
+{%endblock%}

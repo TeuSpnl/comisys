@@ -5,22 +5,18 @@
 {% block content %}
 <h1>Painel do Usuário Master</h1>
 <p>Meta Geral: {{ general_goal | float | currency }}</p>
+<p>Faturamento Total no Mês: {{ total_sales | float | currency }}</p>
+<p>Faturamento Total da Loja no Mês: {{ total_store_sales | float | currency }}</p>
+<p>Faturamento Total da Oficina no Mês: {{ total_workshop_sales | float | currency }}</p>
 <p>Vendedores:</p>
 <ul>
     {% for seller in sellers %}
-        <li>
-            <a href="{{ url_for('dashboards.seller_dashboard', seller_id=seller.id) }}">{{ seller.username }}</a>
-            <form action="{{ url_for('users.delete_user', seller_id=seller.id) }}" method="post" style="display:inline;">
-                <button type="submit" onclick="return confirm('Tem certeza que deseja deletar este vendedor?');">Deletar</button>
-            </form>
-            <form action="{{ url_for('users.update_password', seller_id=seller.id) }}" method="get" style="display:inline;">
-                <button type="submit">Atualizar Senha</button>
-            </form>
-        </li>
+        <a href="{{ url_for('dashboards.dashboard', seller_id=seller['id']) }}">{{ seller.name }}</a>
         <br>
     {% endfor %}
 </ul>
 <p>Implementar funcionalidades de cadastro de metas e upload de planilhas.</p>
+<a href="{{ url_for('users.users') }}">Usuários</a><br>
 <a href="{{ url_for('sales.upload') }}">Upload de Planilha</a><br>
 <a href="{{ url_for('set_goals') }}">Definir Metas</a><br>
 <a href="{{ url_for('users.register') }}">Cadastrar usuário</a><br>

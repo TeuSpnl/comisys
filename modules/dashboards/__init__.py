@@ -7,8 +7,9 @@ dashboards_bp = Blueprint('dashboards', __name__)
 # Rota para dashboard geral
 
 
-@dashboards_bp.route('/dashboard')
-def dashboard():
+@dashboards_bp.route('/dashboard', defaults={'seller_id': None})
+@dashboards_bp.route('/dashboard/<int:seller_id>')
+def dashboard(seller_id):
     if 'user_id' not in session:
         return redirect(url_for('users.login'))
 
@@ -18,191 +19,124 @@ def dashboard():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    if user_role == 'seller':
-        cursor.execute('SELECT name FROM Users WHERE id = ?', (user_id,))
-        username = cursor.fetchone()['name']
+    if user_role == 'seller' or (user_role == 'master' and seller_id is None):
+        seller_id = user_id
 
-        cursor.execute('''
-            SELECT SUM(amount) AS total_sales
-            FROM Sales
-            WHERE user_id = ?
-            AND strftime('%m', date) = strftime('%m', 'now')
-            AND strftime('%Y', date) = strftime('%Y', 'now')
-        ''', (user_id,))
-        total_sales_row = cursor.fetchone()
-        total_sales = total_sales_row['total_sales'] if total_sales_row and total_sales_row['total_sales'] else 0
-
-        cursor.execute('SELECT goal FROM IndividualGoals WHERE user_id = ?', (user_id,))
-        individual_goal_row = cursor.fetchone()
-        individual_goal = individual_goal_row['goal'] if individual_goal_row else 0
-
-        cursor.execute('''
-            SELECT SUM(amount) AS total_company_sales
-            FROM Sales
-            WHERE strftime('%m', date) = strftime('%m', 'now')
-            AND strftime('%Y', date) = strftime('%Y', 'now')
-        ''')
-        total_company_sales_row = cursor.fetchone()
-        total_company_sales = total_company_sales_row['total_company_sales'] if total_company_sales_row and total_company_sales_row['total_company_sales'] else 0
-
-        cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
-        general_goal_row = cursor.fetchone()
-        general_goal = general_goal_row['goal'] if general_goal_row else 0
-
-        # Obter vendas do vendedor no mês atual, ordenadas por data
-        cursor.execute('''
-            SELECT id, date, amount, order_number
-            FROM Sales
-            WHERE user_id = ?
-            AND strftime('%m', date) = strftime('%m', 'now')
-            AND strftime('%Y', date) = strftime('%Y', 'now')
-            ORDER BY date DESC
-        ''', (user_id,))
-        vendas = cursor.fetchall()
-
-        cursor.execute('SELECT branch FROM Users WHERE user_id = ?', (user_id,))
-        user_branch_row = cursor.fetchone()
-        user_branch = user_branch_row['goal'] if user_branch_row else 'N/A'
-
-        conn.close()
-
-        individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
-        company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
-
-        if user_branch.upper() == 'LOJA':
-            # Calcular a comissão com base nas metas individuais atingidas
-            commission_rate = 0.01
-            bonus_rate = 0
-            if total_sales >= 225000:
-                bonus_rate += 0.006
-            elif total_sales >= 170000:
-                bonus_rate += 0.004
-            elif total_sales >= 130000:
-                bonus_rate += 0.003
-        elif user_branch.upper() == 'OFICINA':
-            commission_rate = .5
-            bonus_rate = 0
-            if total_sales >= 50000:
-                commission_rate += 0.05
-
-        commission = total_sales * commission_rate
-        bonus = total_sales * bonus_rate
-
-        return render_template('seller_dashboard.html',
-                               user_role=user_role,
-                               total_sales=total_sales,
-                               total_company_sales=total_company_sales,
-                               individual_percentage=individual_percentage,
-                               company_percentage=company_percentage,
-                               user_id=user_id,
-                               username=username,
-                               general_goal=general_goal,
-                               vendas=vendas,
-                               bonus=bonus,
-                               commission=commission,
-                               individual_goal=individual_goal)
-    elif user_role == 'master':
-        cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller"')
-        sellers = cursor.fetchall()
-
-        cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
-        general_goal_row = cursor.fetchone()
-        general_goal = general_goal_row['goal'] if general_goal_row else 0
-
-        return render_template('master_dashboard.html', sellers=sellers, general_goal=general_goal)
-
-# Rota dinâmica para o dashboard de um vendedor específico
-
-
-@dashboards_bp.route('/dashboard/<int:seller_id>')
-def seller_dashboard(seller_id):
-    if 'user_id' not in session or session['role'] != 'master':
-        return redirect(url_for('users.login'))
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    cursor.execute('SELECT name, branch FROM Users WHERE id = ?', (seller_id,))
+    user_info = cursor.fetchone()
+    user_name = user_info['name']
+    user_branch = user_info['branch']
 
     cursor.execute('''
-        SELECT SUM(amount) AS total_sales
-        FROM Sales
-        WHERE user_id = ?
-        AND strftime('%m', date) = strftime('%m', 'now')
+        SELECT SUM(amount) AS total_seller_sales 
+        FROM Sales 
+        WHERE user_id = ? 
+        AND strftime('%m', date) = strftime('%m', 'now') 
         AND strftime('%Y', date) = strftime('%Y', 'now')
     ''', (seller_id,))
-    total_sales_row = cursor.fetchone()
-    total_sales = total_sales_row['total_sales'] if total_sales_row and total_sales_row['total_sales'] else 0
+    total_saleseller_s_row = cursor.fetchone()
+    total_seller_sales = total_saleseller_s_row['total_seller_sales'] if total_saleseller_s_row and total_saleseller_s_row['total_seller_sales'] else 0
 
     cursor.execute('SELECT goal FROM IndividualGoals WHERE user_id = ?', (seller_id,))
     individual_goal_row = cursor.fetchone()
     individual_goal = individual_goal_row['goal'] if individual_goal_row else 0
 
     cursor.execute('''
-        SELECT SUM(amount) AS total_company_sales
-        FROM Sales
-        WHERE strftime('%m', date) = strftime('%m', 'now')
+        SELECT SUM(amount) AS total_branch_sales 
+        FROM Sales 
+        WHERE user_id IN (SELECT id FROM Users WHERE branch = ?) 
+        AND strftime('%m', date) = strftime('%m', 'now') 
         AND strftime('%Y', date) = strftime('%Y', 'now')
-    ''')
-    total_company_sales_row = cursor.fetchone()
-    total_company_sales = total_company_sales_row['total_company_sales'] if total_company_sales_row and total_company_sales_row['total_company_sales'] else 0
+    ''', (user_branch,))
+    total_branch_sales_row = cursor.fetchone()
+    total_branch_sales = total_branch_sales_row['total_branch_sales'] if total_branch_sales_row and total_branch_sales_row['total_branch_sales'] else 0
 
     cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
     general_goal_row = cursor.fetchone()
-    general_goal = general_goal_row['goal'] if general_goal_row else 0
+    general_goal = float(general_goal_row['goal']) if general_goal_row else 0
 
-    # Obter vendas do vendedor no mês atual, ordenadas por data
     cursor.execute('''
-        SELECT id, date, amount, order_number
-        FROM Sales
-        WHERE user_id = ?
-        AND strftime('%m', date) = strftime('%m', 'now')
+        SELECT date, amount, order_number, id 
+        FROM Sales 
+        WHERE user_id = ? 
+        AND strftime('%m', date) = strftime('%m', 'now') 
         AND strftime('%Y', date) = strftime('%Y', 'now')
         ORDER BY order_number DESC
     ''', (seller_id,))
     vendas = cursor.fetchall()
 
-    # Obter vendedores do banco de dados
-    cursor.execute('''SELECT name, branch FROM Users WHERE id = ?''', (seller_id,))
-    seller = cursor.fetchall()[0]
+    individual_percentage = (total_seller_sales / individual_goal) * 100 if individual_goal else 0
+    branch_percentage = (total_branch_sales / general_goal) * 100 if general_goal else 0
 
-    print(seller['branch'])
-    print('Type: ', type(seller))
+    commission_rate = 0.01
+    bonus_rate = 0
+    if total_seller_sales >= 225000:
+        bonus_rate += 0.006
+    elif total_seller_sales >= 170000:
+        bonus_rate += 0.004
+    elif total_seller_sales >= 130000:
+        bonus_rate += 0.003
 
-    seller_branch = seller['branch']
+    commission = total_seller_sales * commission_rate
+    bonus = total_seller_sales * bonus_rate
 
-    conn.close()
+    if user_role == 'seller' or (user_role == 'master' and seller_id != user_id):
+        conn.close()
+        return render_template('seller_dashboard.html',
+                               total_seller_sales=total_seller_sales,
+                               total_branch_sales=total_branch_sales,
+                               individual_percentage=individual_percentage,
+                               branch_percentage=branch_percentage,
+                               user_id=user_id,
+                               user_name=user_name,
+                               general_goal=general_goal,
+                               vendas=vendas,
+                               individual_goal=individual_goal,
+                               commission=commission,
+                               bonus=bonus,
+                               user_branch=user_branch,
+                               user_role=user_role)
 
-    individual_percentage = (total_sales / individual_goal) * 100 if individual_goal else 0
-    company_percentage = (total_company_sales / general_goal) * 100 if general_goal else 0
-    if seller_branch.upper() == 'LOJA':
-        # Calcular a comissão com base nas metas individuais atingidas
-        commission_rate = 0.01
-        bonus_rate = 0
-        if total_sales >= 225000:
-            bonus_rate += 0.006
-        elif total_sales >= 170000:
-            bonus_rate += 0.004
-        elif total_sales >= 130000:
-            bonus_rate += 0.003
-    elif seller_branch.upper() == 'OFICINA':
-        commission_rate = .5
-        bonus_rate = 0
-        if total_sales >= 50000:
-            commission_rate += 0.05
+    elif user_role == 'master':
+        cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller"')
+        sellers = cursor.fetchall()
 
-    commission = total_sales * commission_rate
-    bonus = total_sales * bonus_rate
+        cursor.execute('''
+            SELECT SUM(amount) AS total_sales 
+            FROM Sales 
+            WHERE strftime('%m', date) = strftime('%m', 'now') 
+            AND strftime('%Y', date) = strftime('%Y', 'now')
+        ''')
+        total_sales_row = cursor.fetchone()
+        total_sales = total_sales_row['total_sales'] if total_sales_row and total_sales_row['total_sales'] else 0
 
-    return render_template(
-        'seller_dashboard.html',
-        user_role=session['role'],
-        total_sales=total_sales,
-        total_company_sales=total_company_sales,
-        individual_percentage=individual_percentage,
-        company_percentage=company_percentage,
-        user_id=seller_id,
-        general_goal=general_goal,
-        vendas=vendas,
-        commission=commission,
-        bonus=bonus,
-        username=seller['name'],
-        individual_goal=individual_goal)
+        cursor.execute('''
+            SELECT SUM(amount) AS total_store_sales 
+            FROM Sales 
+            WHERE user_id IN (SELECT id FROM Users WHERE branch = 'Loja') 
+            AND strftime('%m', date) = strftime('%m', 'now') 
+            AND strftime('%Y', date) = strftime('%Y', 'now')
+        ''')
+        total_store_sales_row = cursor.fetchone()
+        total_store_sales = total_store_sales_row['total_store_sales'] if total_store_sales_row and total_store_sales_row['total_store_sales'] else 0
+
+        cursor.execute('''
+            SELECT SUM(amount) AS total_workshop_sales 
+            FROM Sales 
+            WHERE user_id IN (SELECT id FROM Users WHERE branch = 'Oficina') 
+            AND strftime('%m', date) = strftime('%m', 'now') 
+            AND strftime('%Y', date) = strftime('%Y', 'now')
+        ''')
+        total_workshop_sales_row = cursor.fetchone()
+        total_workshop_sales = total_workshop_sales_row[
+            'total_workshop_sales'] if total_workshop_sales_row and total_workshop_sales_row['total_workshop_sales'] else 0
+
+        conn.close()
+
+        return render_template('master_dashboard.html',
+                               sellers=sellers,
+                               general_goal=general_goal,
+                               total_sales=total_sales,
+                               total_store_sales=total_store_sales,
+                               total_workshop_sales=total_workshop_sales,
+                               user_role=user_role)
