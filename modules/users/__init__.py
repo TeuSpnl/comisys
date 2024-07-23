@@ -28,9 +28,9 @@ def register():
         return redirect(url_for('dashboards.dashboard'))
 
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].lower()
         password = request.form['password']
-        name = request.form['name']
+        name = request.form['name'].lower()
         role = request.form['role']
         branch = request.form['branch']
 
@@ -40,16 +40,16 @@ def register():
         cursor = conn.cursor()
 
         # Verificar se o pedido já existe
-        cursor.execute('SELECT name, username FROM Users WHERE username = ? OR name = ?', (username, name))
+        cursor.execute('SELECT name, username FROM Users WHERE lower(username) = ? OR lower(name) = ?', (username, name))
         existing_users = cursor.fetchall()
 
         if existing_users:
             for user in existing_users:
-                if user['username'] == username:
+                if user['username'].lower() == username:
                     flash('Usuário já cadastrado!', 'error')
                     return render_template('register.html')
-                if user['name'] == name:
-                    flash(f'Nome já cadastrado! Username: {user['username']}', 'error')
+                if user['name'].lower() == name:
+                    flash(f'Nome já cadastrado! Username: {user["username"]}', 'error')
                     return render_template('register.html')
         else:
             cursor.execute('INSERT INTO Users (username, password, name, role, branch) VALUES (?, ?, ?, ?, ?)',
@@ -76,7 +76,10 @@ def delete_user(user_id):
     conn.commit()
     conn.close()
 
-    flash('Vendedor deletado com sucesso!', 'success')
+    if session['user_id'] == user_id:
+        return redirect(url_for('users.logout'))
+
+    flash('Usuário deletado com sucesso!', 'success')
     return redirect(url_for('users.users'))
 
 # Rotas para atualizar senha de usuários
@@ -97,7 +100,10 @@ def update_password(user_id):
         conn.commit()
         conn.close()
 
-        flash('Senha do vendedor atualizada com sucesso!', 'success')
+        if session['user_id'] == user_id:
+            return redirect(url_for('users.logout'))
+
+        flash('Senha atualizada com sucesso!', 'success')
         return redirect(url_for('users.users'))
 
 # Rota para atualizar a filial de um usuário
@@ -116,8 +122,8 @@ def update_branch(user_id):
     conn.commit()
     conn.close()
 
-    flash('Branch updated successfully!', 'success')
-    return redirect(url_for('users.manage_users'))
+    flash('Filial atualizada com sucesso!', 'success')
+    return redirect(url_for('users.users'))
 
 
 # Rota para login
@@ -126,12 +132,12 @@ def update_branch(user_id):
 @users_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].lower()
         password = request.form['password']
 
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('SELECT * FROM Users WHERE username = ?', (username,))
+        cursor.execute('SELECT * FROM Users WHERE lower(username) = ?', (username,))
         user = cursor.fetchone()
         conn.close()
 

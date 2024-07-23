@@ -13,20 +13,25 @@ def dashboard(seller_id):
     if 'user_id' not in session:
         return redirect(url_for('users.login'))
 
+    # Pegar informações do usuário logado
     user_id = session['user_id']
     user_role = session['role']
 
+    # Conectar ao banco de dados
     conn = get_db_connection()
     cursor = conn.cursor()
 
+    # Se o usuário for um vendedor, ele só pode ver o próprio dashboard
     if user_role == 'seller' or (user_role == 'master' and seller_id is None):
         seller_id = user_id
 
+    # Pegar informações do vendedor
     cursor.execute('SELECT name, branch FROM Users WHERE id = ?', (seller_id,))
     user_info = cursor.fetchone()
     user_name = user_info['name']
     user_branch = user_info['branch']
 
+    # Pegar vendas do vendedor
     cursor.execute('''
         SELECT SUM(amount) AS total_seller_sales 
         FROM Sales 
@@ -37,10 +42,12 @@ def dashboard(seller_id):
     total_saleseller_s_row = cursor.fetchone()
     total_seller_sales = total_saleseller_s_row['total_seller_sales'] if total_saleseller_s_row and total_saleseller_s_row['total_seller_sales'] else 0
 
+    # Pegar meta individual do vendedor
     cursor.execute('SELECT goal FROM IndividualGoals WHERE user_id = ?', (seller_id,))
     individual_goal_row = cursor.fetchone()
     individual_goal = individual_goal_row['goal'] if individual_goal_row else 0
 
+    # Pegar vendas da filial do vendedor
     cursor.execute('''
         SELECT SUM(amount) AS total_branch_sales 
         FROM Sales 
@@ -51,10 +58,12 @@ def dashboard(seller_id):
     total_branch_sales_row = cursor.fetchone()
     total_branch_sales = total_branch_sales_row['total_branch_sales'] if total_branch_sales_row and total_branch_sales_row['total_branch_sales'] else 0
 
+    # Pegar meta geral
     cursor.execute('SELECT goal FROM GeneralGoals ORDER BY id DESC LIMIT 1')
     general_goal_row = cursor.fetchone()
     general_goal = float(general_goal_row['goal']) if general_goal_row else 0
 
+    # Pegar vendas do vendedor
     cursor.execute('''
         SELECT date, amount, order_number, id 
         FROM Sales 
@@ -65,20 +74,32 @@ def dashboard(seller_id):
     ''', (seller_id,))
     vendas = cursor.fetchall()
 
+    # Calcular porcentagens individuais e da filial
     individual_percentage = (total_seller_sales / individual_goal) * 100 if individual_goal else 0
     branch_percentage = (total_branch_sales / general_goal) * 100 if general_goal else 0
 
-    commission_rate = 0.01
-    bonus_rate = 0
-    if total_seller_sales >= 225000:
-        bonus_rate += 0.006
-    elif total_seller_sales >= 170000:
-        bonus_rate += 0.004
-    elif total_seller_sales >= 130000:
-        bonus_rate += 0.003
+    # Setar a taxa comissão e bônus da loja
+    if user_branch == 'Loja':
+        commission_rate = 0.01
+        bonus_rate = 0
+        if total_seller_sales >= 225000:
+            bonus_rate = 0.006
+        elif total_seller_sales >= 170000:
+            bonus_rate = 0.004
+        elif total_seller_sales >= 130000:
+            bonus_rate = 0.003
+    # Setar a taxa comissão da oficina
+    elif user_branch == 'Oficina':
+        bonus_rate = 0
+        commission_rate = 0.005
+        if total_branch_sales >= 500000:
+            commission_rate = 0.01
+        
 
     commission = total_seller_sales * commission_rate
     bonus = total_seller_sales * bonus_rate
+    
+    extra_total = commission + bonus
 
     if user_role == 'seller' or (user_role == 'master' and seller_id != user_id):
         conn.close()
@@ -94,6 +115,7 @@ def dashboard(seller_id):
                                individual_goal=individual_goal,
                                commission=commission,
                                bonus=bonus,
+                               extra_total=extra_total,
                                user_branch=user_branch,
                                user_role=user_role)
 

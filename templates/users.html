@@ -8,18 +8,16 @@
     <table>
         <thead>
             <tr>
-                <th>ID</th>
                 <th>Username</th>
                 <th>Name</th>
-                <th>Branch</th>
-                <th>Role</th>
-                <th>Actions</th>
+                <th>Filial</th>
+                <th>Função</th>
+                <th></th>
             </tr>
         </thead>
         <tbody>
             {% for user in users %}
             <tr>
-                <td>{{ user['id'] }}</td>
                 <td>{{ user['username'] }}</td>
                 <td>
                     {% if user['role'] == 'seller' %}
@@ -31,9 +29,6 @@
                 <td>{{ user['branch'] }}</td>
                 <td>{{ user['role'] }}</td>
                 <td>
-                    <form action="{{ url_for('users.delete_user', user_id=user['id']) }}" method="post" style="display:inline;">
-                        <button type="submit">Remover usuário</button>
-                    </form>
                     <form action="{{ url_for('users.update_password', user_id=user['id']) }}" method="post" style="display:inline;">
                         <input type="password" name="new_password" placeholder="New Password" required>
                         <button type="submit">Atualizar senha</button>
@@ -45,11 +40,14 @@
                         </select>
                         <button type="submit">Atualizar filial</button>
                     </form>
+                    <form action="{{ url_for('users.delete_user', user_id=user['id']) }}" method="post" style="display:inline;">
+                        <button type="submit"> Deletar </button>
+                    </form>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    <a href="{{ url_for('users.register') }}">Add User</a>
+    <a href="{{ url_for('users.register') }}">Adicionar usuário</a><br>
     <a href="{{ url_for('dashboards.dashboard') }}">Voltar</a>
 {%endblock%}
