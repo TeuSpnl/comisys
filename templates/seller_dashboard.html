@@ -12,8 +12,10 @@
 <p>Percentual da Meta Individual Atingido: {{ individual_percentage | float | percentage}}</p>
 <p>Percentual da Meta da {{user_branch}} Atingido: {{ branch_percentage | float | percentage}}</p>
 <p>Comissão do Mês: {{ commission | float | currency }}</p>
+{% if user_branch == 'Loja' %}
 <p>Bônus do mês: {{ bonus | float | currency }}</p>
 <p>Total extra: {{ extra_total | float | currency }}</p>
+{% endif %}
 <p><em>OBS: Os valores serão atualizados e não são definitivos.</em></p>
 
 {% if user_role == 'master' %}

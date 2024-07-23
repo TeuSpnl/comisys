@@ -16,21 +16,29 @@ def upload():
     if 'user_id' not in session or session['role'] != 'master':
         return redirect(url_for('users.login'))
 
+    # Processar a planilha de vendas
     if request.method == 'POST':
+        # Verificar se o arquivo foi enviado
         if 'file' not in request.files:
             flash('Nenhum arquivo selecionado', 'error')
             return redirect(request.url)
 
+        # Abre o arquivo enviado
         file = request.files['file']
+        
+        # Verificar se o arquivo é válido
         if file.filename == '':
             flash('Nenhum arquivo selecionado', 'error')
             return redirect(request.url)
 
+        # Se o arquivo for válido, processar
         if file:
+            # Salvar o arquivo temporariamente
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
                 file_path = temp_file.name
                 file.save(file_path)
             
+            # Tenta processar o arquivo
             try:
                 process_file(file_path)
             except Exception as e:
@@ -45,6 +53,7 @@ def upload():
 
 def process_file(file_path):
     try:
+        # Ler a planilha
         df = pd.read_excel(file_path, header=None)
 
         # Identificar a linha inicial da tabela
@@ -54,10 +63,12 @@ def process_file(file_path):
                 start_row = i
                 break
 
+        # Se não encontrar a linha inicial, exibir mensagem de erro
         if start_row is None:
             flash('Não foi possível identificar a linha inicial da tabela.', 'error')
             return
 
+        # Ler a planilha novamente, pulando as linhas iniciais
         df = pd.read_excel(file_path, skiprows=start_row)
 
         # Renomear as colunas para facilitar o acesso
@@ -88,6 +99,7 @@ def process_file(file_path):
         comagro_terms = ['comagro', 'comagro oficina', 'comagro peças e serviços']
         df = df[~df['cliente'].str.lower().str.contains('|'.join(comagro_terms), na=False)]
 
+        # Iniciar a conexão com o banco de dados
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -99,12 +111,21 @@ def process_file(file_path):
         sellers = cursor.fetchall()
         sellers_dict = {remove_accents(seller['name'].lower()): seller['id'] for seller in sellers}
 
+        # Set para armazenar vendedores não cadastrados
+        non_registered_sellers = set()
+        
+        # Inserir vendas na tabela Sales
         for index, row in df.iterrows():
-            vendedor_nome = remove_accents(row['vendedor'].lower())
-            user_id = sellers_dict.get(vendedor_nome, None)  # Pode ser None se o vendedor não estiver cadastrado
+            seller_name = remove_accents(row['vendedor'].lower())
+            user_id = sellers_dict.get(seller_name, None)  # Pode ser None se o vendedor não estiver cadastrado
+            
+            if user_id is None and seller_name not in non_registered_sellers:
+                non_registered_sellers.add(seller_name)
+                flash(f'Vendedor {row["vendedor"].title()} não cadastrado.', 'warning')
 
             order_number = row['nº ped/ os/ prq']
             
+            # Insere a venda no banco de dados
             cursor.execute('''
                 INSERT INTO Sales (date, amount, user_id, order_number)
                 VALUES (?, ?, ?, ?)
