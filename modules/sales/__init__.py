@@ -25,7 +25,7 @@ def upload():
 
         # Abre o arquivo enviado
         file = request.files['file']
-        
+
         # Verificar se o arquivo é válido
         if file.filename == '':
             flash('Nenhum arquivo selecionado', 'error')
@@ -37,7 +37,7 @@ def upload():
             with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as temp_file:
                 file_path = temp_file.name
                 file.save(file_path)
-            
+
             # Tenta processar o arquivo
             try:
                 process_file(file_path)
@@ -102,53 +102,35 @@ def process_file(file_path):
         # Iniciar a conexão com o banco de dados
         conn = get_db_connection()
         cursor = conn.cursor()
-        
+
         # Limpar a tabela Sales antes de inserir novos dados
         cursor.execute('DELETE FROM Sales')
 
         # Obter vendedores do banco de dados
-        cursor.execute('SELECT id, name FROM Users WHERE role = "seller"')
+        cursor.execute('SELECT id, name FROM Users')
         sellers = cursor.fetchall()
-        sellers_dict = {remove_accents(seller['name'].lower()): seller['id'] for seller in sellers}
+        sellers_dict = {remove_accents(seller['name'].title()): seller['id'] for seller in sellers}
 
         # Set para armazenar vendedores não cadastrados
         non_registered_sellers = set()
-        
+
         # Inserir vendas na tabela Sales
         for index, row in df.iterrows():
-            seller_name = remove_accents(row['vendedor'].lower())
+            seller_name = remove_accents(row['vendedor'].title())
             user_id = sellers_dict.get(seller_name, None)  # Pode ser None se o vendedor não estiver cadastrado
-            
+
             if user_id is None and seller_name not in non_registered_sellers:
                 non_registered_sellers.add(seller_name)
                 flash(f'Vendedor {row["vendedor"].title()} não cadastrado.', 'warning')
 
             order_number = row['nº ped/ os/ prq']
-            
+
             # Insere a venda no banco de dados
             cursor.execute('''
                 INSERT INTO Sales (date, amount, user_id, order_number)
                 VALUES (?, ?, ?, ?)
             ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
-            
-            # try:
-            #     int_ord_nb = int(float(order_number))
-            #     if int_ord_nb > 100000:
-            #         cursor.execute('''
-            #             INSERT INTO Sales (date, amount, user_id, order_number)
-            #             VALUES (?, ?, ?, ?)
-            #         ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
-                    
-            #         print(f'Inserindo pedido {order_number}')
-            # except ValueError:
-            #     cursor.execute('''
-            #         INSERT INTO Sales (date, amount, user_id, order_number)
-            #         VALUES (?, ?, ?, ?)
-            #     ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
-            # except Exception as e:
-            #     flash(f'Erro ao processar o pedido {order_number}: {e}, {e.__class__}', 'error')
-            #     return
-            
+
         conn.commit()
         conn.close()
 

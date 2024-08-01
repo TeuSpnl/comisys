@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, redirect, url_for, session
+from flask import Blueprint, render_template, redirect, url_for, session, flash
 from ..db import get_db_connection
 from datetime import datetime
 
@@ -26,8 +26,13 @@ def dashboard(seller_id):
         seller_id = user_id
 
     # Pegar informações do vendedor
-    cursor.execute('SELECT name, branch FROM Users WHERE id = ?', (seller_id,))
+    cursor.execute('SELECT name, branch, active FROM Users WHERE id = ?', (seller_id,))
     user_info = cursor.fetchone()
+    
+    if not user_info or user_info['active'] == 0:
+        flash('Usuário inativo ou não encontrado.', 'error')
+        return redirect(url_for('users.login'))
+    
     user_name = user_info['name']
     user_branch = user_info['branch']
 
@@ -120,7 +125,7 @@ def dashboard(seller_id):
                                user_role=user_role)
 
     elif user_role == 'master':
-        cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller"')
+        cursor.execute('SELECT id, username, name FROM Users WHERE role = "seller" AND active = 1')
         sellers = cursor.fetchall()
 
         cursor.execute('''

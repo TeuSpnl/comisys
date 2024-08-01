@@ -30,9 +30,10 @@ def register():
     if request.method == 'POST':
         username = request.form['username'].lower()
         password = request.form['password']
-        name = request.form['name'].lower()
+        name = request.form['name'].title()
         role = request.form['role']
         branch = request.form['branch']
+        active = 1 if 'active' in request.form else 0
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
 
@@ -48,12 +49,12 @@ def register():
                 if user['username'].lower() == username:
                     flash('Usuário já cadastrado!', 'error')
                     return render_template('register.html')
-                if user['name'].lower() == name:
+                if user['name'].title() == name:
                     flash(f'Nome já cadastrado! Username: {user["username"]}', 'error')
                     return render_template('register.html')
         else:
-            cursor.execute('INSERT INTO Users (username, password, name, role, branch) VALUES (?, ?, ?, ?, ?)',
-                           (username, hashed_password, name, role, branch))
+            cursor.execute('INSERT INTO Users (username, password, name, role, branch, active) VALUES (?, ?, ?, ?, ?, ?)',
+                           (username, hashed_password, name, role, branch, active))
         conn.commit()
         conn.close()
 
@@ -126,6 +127,22 @@ def update_branch(user_id):
     return redirect(url_for('users.users'))
 
 
+@users_bp.route('/update_status/<int:user_id>', methods=['POST'])
+def update_status(user_id):
+    if 'user_id' not in session or session['role'] != 'master':
+        return redirect(url_for('users.login'))
+    
+    new_status = int(request.form['new_status'])
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute('UPDATE Users SET active = ? WHERE id = ?', (new_status, user_id))
+    conn.commit()
+    conn.close()
+    
+    flash('Status atualizado com sucesso!', 'success')
+    return redirect(url_for('users.manage_users'))
+
 # Rota para login
 
 
@@ -142,6 +159,9 @@ def login():
         conn.close()
 
         if user and check_password_hash(user['password'], password):
+            if not user['active']:
+                flash('Usuário inativo, entre em contato com o administrador.', 'error')
+                return render_template('login.html')
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['role'] = user['role']

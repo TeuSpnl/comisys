@@ -38,7 +38,8 @@ def init_db():
         password TEXT NOT NULL,
         name TEXT NOT NULL,  -- Nome completo do usuário
         role TEXT NOT NULL,  -- 'seller' ou 'master'
-        branch TEXT NOT NULL  -- Filial do usuário
+        branch TEXT NOT NULL,  -- Filial do usuário
+        active INTEGER NOT NULL DEFAULT 1
     );
     ''')
 
