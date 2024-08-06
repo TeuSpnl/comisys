@@ -103,8 +103,14 @@ def process_file(file_path):
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # Limpar a tabela Sales antes de inserir novos dados
-        cursor.execute('DELETE FROM Sales')
+        # Marcar todas as vendas do mês atual como não processadas
+        current_year = datetime.now().year
+        current_month = datetime.now().month
+        cursor.execute('''
+            UPDATE Sales 
+            SET processed = 0 
+            WHERE strftime('%Y', date) = ? AND strftime('%m', date) = ?
+        ''', (current_year, current_month))
 
         # Obter vendedores do banco de dados
         cursor.execute('SELECT id, name FROM Users')
@@ -124,12 +130,33 @@ def process_file(file_path):
                 flash(f'Vendedor {row["vendedor"].title()} não cadastrado.', 'warning')
 
             order_number = row['nº ped/ os/ prq']
+            sale_amount = row['valor total']
 
-            # Insere a venda no banco de dados
-            cursor.execute('''
-                INSERT INTO Sales (date, amount, user_id, order_number)
-                VALUES (?, ?, ?, ?)
-            ''', (row['data'].strftime('%Y-%m-%d'), row['valor total'], user_id, order_number))
+            # Verifica se o pedido já existe no banco de dados
+            cursor.execute('SELECT id, amount FROM Sales WHERE order_number = ?', (order_number,))
+            existing_order = cursor.fetchone()
+
+            if existing_order:
+                # Se o pedido existe, atualiza o valor do pedido
+                new_amount = existing_order['amount'] + sale_amount
+                if new_amount <= 0:
+                    cursor.execute('DELETE FROM Sales WHERE id = ?', (existing_order['id'],))
+                else:
+                    cursor.execute('UPDATE Sales SET amount = ?, processed = 1 WHERE id = ?',
+                                   (new_amount, existing_order['id']))
+            else:
+                # Insere a venda no banco de dados
+                cursor.execute('''
+                    INSERT INTO Sales (date, amount, user_id, order_number, processed)
+                    VALUES (?, ?, ?, ?, 1)
+                ''', (row['data'].strftime('%Y-%m-%d'), sale_amount, user_id, order_number))
+
+        # Apagar vendas do mês atual que não foram processadas (consideradas devoluções totais)
+        cursor.execute('''
+            DELETE FROM Sales 
+            WHERE processed = 0 
+            AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
+        ''', (current_year, current_month))
 
         conn.commit()
         conn.close()

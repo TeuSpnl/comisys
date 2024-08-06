@@ -3,14 +3,67 @@
 {% block title %}Painel do Vendedor{% endblock %}
 
 {% block content %}
+
+{% block head %}
+<style>
+    .year p{
+        cursor: pointer;
+        font-weight: bold;
+        margin: 5px 0;
+        max-width: fit-content;
+    }
+    .months{
+        display: none;
+        margin-left: 20px;
+    }
+    .months p{
+        max-width: fit-content;
+        cursor: pointer;
+        margin: 5px 0 5px 0;
+    }
+    .arrow_down{
+        display: none;
+    }
+    .arrow_right{
+        display: contents;
+    }
+</style>
+{% endblock %}
+
 <h1>Painel do Vendedor</h1>
 <p>Nome: {{user_name}}</p>
+
+<br>
+
+<!-- Seleção de Ano e Mês -->
+<div>
+    {% set years = available_dates | map(attribute='year') | unique %}
+    {% for y in years %}
+    <div>
+        <div class="year" onclick="toggleMonths('{{ y }}')">
+            <p>
+                <span class="arrow_right" style='font-size:15px;'>&#11208;</span>
+                <span class="arrow_down" style='font-size:15px;'>&#11206;</span>
+                 {{ y }}
+            </p>
+        </div>
+        <div id="months-{{ y }}" class="months">
+            {% for date in available_dates if date['year'] == y %}
+            <p onclick="navigateTo('{{seller_id}}', '{{ y }}', '{{ date['month']|int }}')">
+                {{ date['month']|int }} - {{ date['month']|int | month_name }}
+            </p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
 <p>Meta Geral: {{ general_goal | float | currency }}</p>
 <p>Meta Individual: {{ individual_goal | float | currency }}</p>
-<p>Faturamento Total da {{ user_branch }} no Mês: {{ total_branch_sales | float | currency }}</p>
+<p>Faturamento Total da {{ user_branch[0] }} no Mês: {{ total_branch_sales | float | currency }}</p>
 <p>Faturamento Atual no Mês: {{ total_seller_sales | float | currency }}</p>
 <p>Percentual da Meta Individual Atingido: {{ individual_percentage | float | percentage}}</p>
-<p>Percentual da Meta da {{user_branch}} Atingido: {{ branch_percentage | float | percentage}}</p>
+<p>Percentual da Meta da {{ user_branch[0] }} Atingido: {{ branch_percentage | float | percentage}}</p>
 <p>Comissão do Mês: {{ commission | float | currency }}</p>
 {% if user_branch == 'Loja' %}
 <p>Bônus do mês: {{ bonus | float | currency }}</p>
@@ -51,9 +104,32 @@
 </table>
 
 {% if user_role == 'master' %}
-<form action="{{ url_for('sales.delete_all_sales', seller_id=user_id) }}" method="post">
+<form action="{{ url_for('sales.delete_all_sales', seller_id=seller_id) }}" method="post">
     <button type="submit" onclick="return confirm('Tem certeza que deseja deletar todas as vendas deste vendedor?');">Remover Todas as Vendas</button>
 </form>
 {% endif %}
+
+
+<script>
+    function toggleMonths(year) {
+        const months = document.getElementById('months-' + year);
+        const arrowRight = months.previousElementSibling.querySelector('.arrow_right');
+        const arrowDown = months.previousElementSibling.querySelector('.arrow_down');
+        if (months.style.display === 'none') {
+            months.style.display = 'block';
+            arrowRight.style.display = 'none';
+            arrowDown.style.display = 'contents';
+        } else {
+            months.style.display = 'none';
+            arrowRight.style.display = 'contents';
+            arrowDown.style.display = 'none';
+        }
+    }
+
+    function navigateTo(sellerId, year, month) {
+        const url = `/dashboard/${sellerId}/${year}/${month}`;
+        window.location.href = url;
+    }
+</script>
 
 {% endblock %}

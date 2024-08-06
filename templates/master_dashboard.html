@@ -3,7 +3,62 @@
 {% block title %}Painel do Usuário Master{% endblock %}
 
 {% block content %}
+{% block head %}
+<style>
+    .year p{
+        cursor: pointer;
+        font-weight: bold;
+        margin: 5px 0;
+        max-width: fit-content;
+    }
+    .months{
+        display: none;
+        margin-left: 20px;
+    }
+    .months p{
+        max-width: fit-content;
+        cursor: pointer;
+        margin: 5px 0 5px 0;
+    }
+    .arrow_down{
+        display: none;
+    }
+    .arrow_right{
+        display: contents;
+    }
+</style>
+{% endblock %}
+
 <h1>Painel do Usuário Master</h1>
+
+<br>
+
+<!-- Seleção de Ano e Mês -->
+<div>
+    {% set years = available_dates | map(attribute='year') | unique %}
+    {% for y in years %}
+    <div>
+        <div class="year" onclick="toggleMonths('{{ y }}')">
+            
+            <p>
+                <span class="arrow_right" style='font-size:15px;'>&#11208;</span>
+                <span class="arrow_down" style='font-size:15px;'>&#11206;</span>
+                 {{ y }}
+            </p>
+        </div>
+        <div id="months-{{ y }}" class="months">
+            {% for date in available_dates if date['year'] == y %}
+            <p onclick="navigateTo('{{ y }}', '{{ date['month']|int }}')">
+                {{ date['month']|int }} - {{ date['month']|int | month_name }}
+            </p>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<br>
+
 <p>Meta Geral: {{ general_goal | float | currency }}</p>
 <p>Faturamento Total no Mês: {{ total_sales | float | currency }}</p>
 <p>Faturamento Total da Loja no Mês: {{ total_store_sales | float | currency }}</p>
@@ -11,7 +66,7 @@
 <p>Vendedores:</p>
 <ul>
     {% for seller in sellers %}
-        <a href="{{ url_for('dashboards.dashboard', seller_id=seller['id']) }}">{{ seller.name }}</a>
+        <a href="{{ url_for('dashboards.dashboard', seller_id=seller['id'], year=year, month=month) }}">{{ seller.name }}</a>
         <br>
     {% endfor %}
 </ul>
@@ -20,4 +75,27 @@
 <a href="{{ url_for('sales.upload') }}">Upload de Planilha</a><br>
 <a href="{{ url_for('set_goals') }}">Definir Metas</a><br>
 <a href="{{ url_for('users.logout') }}">Logout</a>
+
+<script>
+    function toggleMonths(year) {
+        const months = document.getElementById('months-' + year);
+        const arrowRight = months.previousElementSibling.querySelector('.arrow_right');
+        const arrowDown = months.previousElementSibling.querySelector('.arrow_down');
+        if (months.style.display === 'none') {
+            months.style.display = 'block';
+            arrowRight.style.display = 'none';
+            arrowDown.style.display = 'contents';
+        } else {
+            months.style.display = 'none';
+            arrowRight.style.display = 'contents';
+            arrowDown.style.display = 'none';
+        }
+    }
+
+    function navigateTo(year, month) {
+        const url = `/dashboard/${year}/${month}`;
+        window.location.href = url;
+    }
+</script>
+
 {% endblock %}

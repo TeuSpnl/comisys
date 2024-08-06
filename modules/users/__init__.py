@@ -141,7 +141,7 @@ def update_status(user_id):
     conn.close()
     
     flash('Status atualizado com sucesso!', 'success')
-    return redirect(url_for('users.manage_users'))
+    return redirect(url_for('users.users'))
 
 # Rota para login
 

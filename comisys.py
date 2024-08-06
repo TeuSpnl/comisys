@@ -1,10 +1,10 @@
-import os
 import sqlite3
 from flask import Flask, render_template, request, redirect, url_for, session, flash
 from modules.dashboards import dashboards_bp
 from modules.sales import sales_bp
 from modules.users import users_bp
-from utils.text_utils import format_currency, format_percentage
+from utils.text_utils import format_currency, format_percentage, month_name
+import datetime
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
@@ -101,6 +101,8 @@ def set_goals():
         individual_goal = request.form['individual_goal']
         general_goal = request.form['general_goal']
         user_id = request.form['user_id']
+        year = datetime.datetime.now().year
+        month = datetime.datetime.now().month
 
         if not individual_goal and not general_goal:
             flash('Preencha pelo menos um dos campos de metas.', 'error')
@@ -108,19 +110,19 @@ def set_goals():
 
         # Atualizar ou inserir meta individual
         if individual_goal:
-            cursor.execute('SELECT * FROM IndividualGoals WHERE user_id = ?', (user_id,))
-            if cursor.fetchone():
-                cursor.execute('UPDATE IndividualGoals SET goal = ? WHERE user_id = ?', (individual_goal, user_id))
-            else:
-                cursor.execute('INSERT INTO IndividualGoals (user_id, goal) VALUES (?, ?)', (user_id, individual_goal))
+            cursor.execute('''
+            INSERT INTO IndividualGoals (user_id, year, month, goal)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(user_id, year, month) DO UPDATE SET goal=excluded.goal
+        ''', (user_id, year, month, individual_goal))
 
         # Atualizar meta geral (apenas uma entrada)
         if general_goal:
-            cursor.execute('SELECT * FROM GeneralGoals')
-            if cursor.fetchone():
-                cursor.execute('UPDATE GeneralGoals SET goal = ? WHERE id = 1', (general_goal,))
-            else:
-                cursor.execute('INSERT INTO GeneralGoals (goal) VALUES (?)', (general_goal,))
+            cursor.execute('''
+            INSERT INTO GeneralGoals (year, month, goal)
+            VALUES (?, ?, ?)
+            ON CONFLICT(year, month) DO UPDATE SET goal=excluded.goal
+        ''', (year, month, general_goal))
 
         conn.commit()
 
@@ -153,6 +155,7 @@ def set_goals():
 
 app.jinja_env.filters['currency'] = format_currency
 app.jinja_env.filters['percentage'] = format_percentage
+app.jinja_env.filters['month_name'] = month_name
 
 
 if __name__ == '__main__':
