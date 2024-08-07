@@ -115,7 +115,7 @@
         const months = document.getElementById('months-' + year);
         const arrowRight = months.previousElementSibling.querySelector('.arrow_right');
         const arrowDown = months.previousElementSibling.querySelector('.arrow_down');
-        if (months.style.display === 'none') {
+        if (months.style.display === 'none' || months.style.display === '') {
             months.style.display = 'block';
             arrowRight.style.display = 'none';
             arrowDown.style.display = 'contents';
@@ -130,6 +130,17 @@
         const url = `/dashboard/${sellerId}/${year}/${month}`;
         window.location.href = url;
     }
+
+    // Adiciona um event listener para cada ano
+    document.addEventListener('DOMContentLoaded', function() {
+        const years = document.querySelectorAll('.year');
+        years.forEach(year => {
+            year.addEventListener('click', function() {
+                const yearValue = this.textContent.trim();
+                toggleMonths(yearValue);
+            });
+        });
+    });
 </script>
 
 {% endblock %}

@@ -4,7 +4,9 @@
 
 {% block content %}
 <h1>Definir Metas</h1>
+
 <p>Meta Geral Atual:  {{ general_goal | float | currency }}</p>
+
 <form method="post" onsubmit="return validateForm()">
     <label for="user_id">Selecionar Vendedor:</label><br>
     <select id="user_id" name="user_id" onchange="updateIndividualGoal()">
